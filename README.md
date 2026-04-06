@@ -1,3 +1,4 @@
+![](docs/aggregating-peptides-simulation-pipeline.png)
 # aggrepep
 
 ## Introduction
