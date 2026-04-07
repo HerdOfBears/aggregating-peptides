@@ -15,7 +15,11 @@ In this project's methodology, we examine whether a given peptide sequence is pr
 - `README.md` - project overview and usage guide
 
 ## Installation
-At the moment, there is no pypi method of installing this package. So you will have to clone this repo, make a python virtual environment, and install it manually. 
+At the moment, there is no pypi method of installing this package. So you will have to clone this repo, make a python virtual environment, and install it manually.
+### Dependencies
+This project has a number of dependencies, some of which are captured in the setup.py and requirements.txt. But a version of gromacs is required for gmx insert-molecules. In the future, this will hopefully be updated such that we no longer require gromacs. [vermouth](https://github.com/marrink-lab/vermouth-martinize) is used for martinize2. [insane](https://github.com/Tsjerk/Insane) is used for solvation. [openmm](https://github.com/openmm/openmm) and [martini_openmm](https://github.com/maccallumlab/martini_openmm) are used for simulating all-atom and coarse-grained systems, respectively.
+
+### installation
 ```bash
 pip install -e .
 ```
