@@ -17,6 +17,12 @@ from io import StringIO
 from PeptideBuilder import Geometry
 import PeptideBuilder
 
+import MDAnalysis as mda
+from MDAnalysis.topology import tables # DEPRECATED AFTER mdanalysis 3.0.0
+from MDAnalysis.analysis import distances as mda_distances
+
+import parmed as pmd
+import mdtraj as mdt
 
 BACKBONE_NAMES = {"N", "CA", "C", "O"}
 ALPHABET = {i:chr(65+i) for i in range(26)}
@@ -1057,7 +1063,7 @@ def stack_chains(topology, positions, num_chains=8, spacing=3.0, twist_angle=0, 
     return final_topology, final_positions
 
 
-def check_for_overlap(topology, positions, chain1="A", chain2="B", 
+def check_for_overlap_old(topology, positions, chain1="A", chain2="B", 
                       bbox_atoms="all", tolerance=0.0, verbose=True):
     """
     Check if two chains' bounding boxes overlap.
@@ -1229,7 +1235,7 @@ def check_for_overlap(topology, positions, chain1="A", chain2="B",
 
 def check_for_overlap(topology, positions, chain1="A", chain2="B", 
                       bbox_atoms="all", tolerance=0.0, verbose=True,
-                      method="bounding_box"):
+                      method="vdwradii"):
     """
     Check if two chains' bounding volumes overlap.
     
@@ -1257,8 +1263,9 @@ def check_for_overlap(topology, positions, chain1="A", chain2="B",
         If True, print detailed information about the bounding volumes
         and overlap status (default True)
     method : str
-        choices=["bounding_box", "parallelogram", "obb"]
+        choices=["vdwradii", "bounding_box", "parallelogram", "obb"]
         Method for overlap detection:
+        - "vdwradii": Check for overlap based on van der Waals radii of atoms
         - "bounding_box": Axis-aligned bounding box (AABB)
         - "parallelogram": Oriented bounding parallelogram aligned with chain axis
         - "obb": Oriented bounding box (full 3D orientation)
@@ -1301,6 +1308,9 @@ def check_for_overlap(topology, positions, chain1="A", chain2="B",
             print(f"Warning: Chain {chain2} not found in topology")
         return False
     
+    if method == "vdwradii":
+        return _check_for_overlap_vdwradii(topology, positions, chain1, chain2, tolerance)
+
     # Helper function to filter atoms based on bbox_atoms option
     def should_include_atom(atom):
         if bbox_atoms == "all":
@@ -1342,6 +1352,70 @@ def check_for_overlap(topology, positions, chain1="A", chain2="B",
                                             tolerance, verbose)
     else:  # method == "obb"
         return _check_obb_overlap(pos1, pos2, chain1, chain2, tolerance, verbose)
+
+def _check_for_overlap_vdwradii(topology, positions, chain1, chain2, tolerance=0.0):
+    """
+    Check for overlap between two chains based on van der Waals radii.
+    For each pair of atoms (one from each chain), calculate the distance and compare
+    it to the sum of their van der Waals radii plus the tolerance. 
+    If any pair of atoms is closer than this threshold, we consider the chains: overlapping.
+    Overlap returns true, no overlap returns false.
+
+    Parameters:
+    -----------
+    topology : openmm.app.Topology
+        Topology containing the chains
+    positions : list of Vec3
+        Positions of all atoms
+    chain1 : str
+        Chain ID of first chain
+    chain2 : str
+        Chain ID of second chain
+    tolerance : float
+        Additional buffer distance in nanometers (default 0.0)
+        Positive values effectively increase the size of the atoms, making overlap more likely.
+        Negative values effectively decrease the size of the atoms, making overlap less likely.
+
+    Returns:
+    --------
+    overlap : bool
+        True if any pair of atoms from the two chains are closer than the sum of their
+        van der Waals radii plus the tolerance, False otherwise
+    """
+    _coords = []
+    for _pos in positions:
+        _coords.append([
+            _pos.x,
+            _pos.y,
+            _pos.z
+        ]
+        )
+    _coords = np.array(_coords)
+
+    _vdwradii_angstroms = tables.vdwradii #angstroms
+
+    _struct = pmd.openmm.load_topology(topology, xyz=_coords)
+    _universe = mda.Universe(_struct)
+
+    _chain1_atomgroup = _universe.select_atoms(f"chainID {chain1}")
+    _chain2_atomgroup = _universe.select_atoms(f"chainID {chain2}")
+
+    # compute all pairwise distances between atoms in the two chains
+    for i in range(len(_chain1_atomgroup)):
+        _chain1_atom_i = _chain1_atomgroup[i]
+        _vdwradii1_ang = _vdwradii_angstroms.get(_chain1_atom_i.element, None)
+        
+        for j in range(len(_chain2_atomgroup)):
+            if j>i:
+                _chain2_atom_j = _chain2_atomgroup[j]
+                _vdwradii2_ang = _vdwradii_angstroms.get(_chain2_atom_j.element, None)
+                _summed_vdwradii_nm = (_vdwradii1_ang+_vdwradii2_ang)/10
+                
+                _diff = _chain1_atom_i.position - _chain2_atom_j.position
+                _euclidean_dist = np.linalg.norm(_diff, ord=2)
+                if _euclidean_dist <= (_summed_vdwradii_nm + tolerance):
+                    return True
+    return False                
 
 def _check_aabb_overlap(pos1, pos2, chain1, chain2, tolerance, verbose):
     """Check axis-aligned bounding box overlap."""

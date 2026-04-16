@@ -257,6 +257,7 @@ def main(params):
     _, positions = setup_and_minimize(topology, positions)
 
     if params["build_stacked_sheets"]:
+        overlap_check_method = "vdwradii"
         positions = align_pc1_to_x_backbone(topology, positions)
 
         dtheta = 1.0
@@ -298,7 +299,8 @@ def main(params):
                         twist_pos, 
                         chain_sheet1="A", 
                         chain_sheet2="C",
-                        exclude_termini=1
+                        exclude_termini=1,
+                        verbose=False
                     )
                     if _hydrophobic_burial["buried_score"]+_hydrophobic_burial["exposed_score"]>0:
                         if _hydrophobic_burial['buried_fraction']<0.5:
@@ -312,7 +314,7 @@ def main(params):
                         bbox_atoms="all",
                         tolerance=0.0,
                         verbose=False,
-                        method="obb"
+                        method=overlap_check_method
                     )
                 
                     do_chainsAK_overlap = check_for_overlap(
@@ -323,7 +325,7 @@ def main(params):
                         bbox_atoms="all",
                         tolerance=0.0,
                         verbose=False,
-                        method="obb"
+                        method=overlap_check_method
                     )
                     
                     if do_chainsAB_overlap or do_chainsAK_overlap:
@@ -384,7 +386,7 @@ def main(params):
             bbox_atoms="all",
             tolerance=0.0,
             verbose=False,
-            method="obb"
+            method=overlap_check_method
             
         )
 
@@ -396,7 +398,7 @@ def main(params):
             bbox_atoms="all",
             tolerance=0.0,
             verbose=False,
-            method="obb"
+            method=overlap_check_method
         )
         logging.info(f"{do_chainsAB_overlap=} | {do_chainsAK_overlap=}")
         new_twist_top, new_twist_pos, (boxA, boxB, boxC) = setup_rectangular_box(
