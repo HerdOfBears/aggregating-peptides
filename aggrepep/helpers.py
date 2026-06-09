@@ -1286,7 +1286,7 @@ def check_for_overlap(topology, positions, chain1="A", chain2="B",
     if bbox_atoms not in ["all", "backbone", "heavy", "ca"]:
         raise ValueError(f"{bbox_atoms=} must be in ['all', 'backbone', 'heavy', 'ca']")
     
-    if method not in ["bounding_box", "parallelogram", "obb"]:
+    if method not in ["vdwradii","bounding_box", "parallelogram", "obb"]:
         raise ValueError(f"{method=} must be in ['bounding_box', 'parallelogram', 'obb']")
     
     # Find the chains in topology

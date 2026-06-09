@@ -24,7 +24,9 @@ import freesasa
 
 from aggrepep.martini_sasa import get_martini_vdw_radii
 from itertools import combinations
-
+from scipy.cluster.hierarchy import fcluster, linkage
+from scipy.stats import mode as stmode
+from MDAnalysis.lib.distances import distance_array
 
 def compute_beta_content_score(top_fpath, traj_fpath, frames_per_ns=500):
     """
@@ -335,7 +337,10 @@ def compute_aggregation_propensity_contact(top_fpath, traj_fpath, frames_per_ns=
     # return average over time
     return np.mean(_max_path_val)
 
-def compute_avg_max_cluster_size(top_fpath, traj_fpath, cutoff_distance=22.5,frames_per_ns=500):
+def compute_avg_max_cluster_size(top_fpath, traj_fpath, sequence, 
+                                 cutoff_distance=22.5,
+                                 frames_per_ns=500,
+                                 N_blocks=10):
     """
     Expects CG sims.
     Computes the average maximum cluster size of peptides in the trajectory.
@@ -348,8 +353,51 @@ def compute_avg_max_cluster_size(top_fpath, traj_fpath, cutoff_distance=22.5,fra
             file path to topology
         traj_fpath: str|path
             file path to trajectory
+        sequence: str
+            peptide sequence (used to determine chains)
         cutoff_distance: float
+            in angstroms
             distance cutoff for defining clusters (in Angstroms)
         frames_per_ns: int
             Number of frames per nanosecond. Default is 500
+        N_blocks: int
+            Number of blocks for block averaging (default 10)
     """
+
+    _seqL = len(sequence)
+    uni = mda.Universe(
+        top_fpath,
+        traj_fpath,
+    )
+    protein_atoms = uni.select_atoms("not name W WP WM NA+ CL-")
+    # determine number of molecules by counting residues and dividing by sequence length
+    nmol = len(protein_atoms.residues) // _seqL
+
+    # grab chains as groups of residues
+    chain_groups = [protein_atoms.residues[0 + _seqL*j:_seqL + _seqL*(j+1)] for j in range(0, nmol)]
+
+    # determine number of frames to analyze (last 10ns) using frames_per_ns
+    N_frames = frames_per_ns * 10
+    cutoffs = [cutoff_distance]
+    block_size = N_frames // N_blocks
+
+    n_clusters_all = np.zeros((N_frames, len(cutoffs)))
+
+    for f_idx, ts in enumerate(uni.trajectory[-N_frames:]):
+        coms = np.array([g.center_of_mass() for g in chain_groups])
+        dist_matrix = distance_array(coms, coms, box=uni.dimensions)
+        condensed = dist_matrix[np.triu_indices(len(coms), k=1)]
+        Z = linkage(condensed, method='single')
+        _temp = []
+        for c in cutoffs:
+            _clustering = fcluster(Z, t=c, criterion='distance')
+            _clusterid_mode = stmode(_clustering)
+            _max_cluster_size = _clusterid_mode.count
+            _temp.append(_max_cluster_size)
+        n_clusters_all[f_idx] =_temp
+            
+    # Block averaging: reshape into (N_blocks, block_size, n_cutoffs), average within each block
+    block_means = n_clusters_all.reshape(N_blocks, block_size, len(cutoffs)).mean(axis=1)
+    mean_clusters = block_means.mean(axis=0)
+    std_clusters = block_means.std(axis=0)
+    sem_clusters = std_clusters / np.sqrt(N_blocks)
