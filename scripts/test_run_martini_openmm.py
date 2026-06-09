@@ -1,3 +1,4 @@
+import json
 import logging
 
 from openmm.unit import *
@@ -18,7 +19,13 @@ def main(params):
     test_dir = params["wdir"]
     platform = Platform.getPlatformByName("OpenCL")
     properties = {'Precision': 'double'}
-    SAVE_EVERY = 5_000 # steps
+
+    SAVE_EVERY = params.get("output_frequency", 5000)
+    RANDOM_SEED = params.get("random_seed", 42)
+    temperature= params.get("temperature", 310) # in Kelvin
+    pressure   = params.get("pressure", 1.0) # in bar
+    step_size  = params.get("time_step", 20) # in fs
+    total_npt_time = params.get("total_npt_time", 100) # in ns
 
     _gro_fpath = os.path.join(test_dir,params["gro"]) if not os.path.isfile(params["gro"]) else params["gro"]
     _top_fpath = os.path.join(test_dir,params["top"]) if not os.path.isfile(params["top"]) else params["top"]
@@ -27,6 +34,7 @@ def main(params):
     )
     box_vectors = conf.getPeriodicBoxVectors()
     
+    logging.info(f"Loading topology from {_top_fpath} with box vectors {box_vectors}")
     top = martini.MartiniTopFile(
         _top_fpath,
         periodicBoxVectors=box_vectors,
@@ -36,12 +44,13 @@ def main(params):
 
     system = top.create_system()
 
-    dt = 20 * femtosecond
-    integrator = LangevinIntegrator(310 * kelvin,
+    dt = step_size * femtosecond
+    integrator = LangevinIntegrator(temperature * kelvin,
                                     10.0 / picosecond,
                                     dt)
-    integrator.setRandomNumberSeed(0)
+    integrator.setRandomNumberSeed(RANDOM_SEED)
 
+    logging.info(f"Creating Simulation object")
     simulation = Simulation(
         top.topology, 
         system, 
@@ -51,6 +60,7 @@ def main(params):
 
     simulation.context.setPositions(conf.getPositions())
 
+    logging.info(f"Minimizing energy...")
     _states = simulation.context.getState(getEnergy=True, getForces=True)
     for i in range(10):
         energiesI = _states.getPotentialEnergy()
@@ -73,18 +83,18 @@ def main(params):
                                                     volume=True,
                                                     speed=True,
                                                     remainingTime=True,
-                                                    totalSteps=math.ceil(100*nanosecond/dt)+math.ceil(2*nanosecond/dt)
+                                                    totalSteps=math.ceil(total_npt_time*nanosecond/dt)+math.ceil(2*nanosecond/dt)
         )
     )
 
 
-    simulation.context.setVelocitiesToTemperature(310 * kelvin)
+    simulation.context.setVelocitiesToTemperature(temperature * kelvin)
     logging.info('Running NVT equilibration...')
     simulation.step(
         math.ceil(1*nanosecond/dt) #1ns
     ) 
 
-    system.addForce(MonteCarloBarostat(1 * bar, 310 * kelvin))
+    system.addForce(MonteCarloBarostat(pressure * bar, temperature * kelvin))
     # to update the simulation object to take in account the new system
     simulation.context.reinitialize(True)
     logging.info('Running NPT equilibration...')
@@ -96,9 +106,19 @@ def main(params):
     simulation.reporters.append(xtc_reporter)
 
     # run simulation
-    logging.info("Running simulation...")
-    simulation.step(math.ceil(100*nanosecond/dt)) #25ns
-    pass
+    logging.info(f"Running simulation for {total_npt_time} ns...")
+    checkpoint_interval=min(100, total_npt_time) # in ns
+    _previous_time_interval = 0
+    for _step in range( int(total_npt_time//checkpoint_interval) ):
+        _npt_time_interval = int( checkpoint_interval )
+
+        simulation.step( math.ceil( _npt_time_interval*nanosecond/dt) )
+
+        simulation.saveState(      os.path.join(test_dir,f"prod_{_previous_time_interval}to{_npt_time_interval*(_step+1)}ns.state") )
+        simulation.saveCheckpoint( os.path.join(test_dir,f"prod_{_previous_time_interval}to{_npt_time_interval*(_step+1)}ns.chk") )
+
+        _previous_time_interval += _npt_time_interval
+
 
 if __name__ == "__main__":
 
@@ -107,9 +127,20 @@ if __name__ == "__main__":
     parser.add_argument("--top", type=str, required=True, help="Path to the input TOP file")
     parser.add_argument("--pw", action="store_true", help="Whether to run polarizable water simulation (if not set, will assume non-polarizable water simulation)")
     parser.add_argument("--wdir", type=str, default=".", help="Working directory for the test simulation")
+    parser.add_argument("--params_file", type=str, required=False, default=None, help="Path to JSON file containing simulation parameters. Optional as parameters have defaults.")
 
     args = parser.parse_args()
     params=vars(args)
+    if args.params_file is not None:
+        with open(args.params_file) as fobj:
+            loaded_params_file = json.load(fobj)
+
+        if "coarse_grained_martini" in loaded_params_file:
+            loaded_params_file = loaded_params_file["coarse_grained_martini"]
+
+        for k, v in loaded_params_file.items():
+            params[k] = v
+        params["params_file"] = args.params_file
 
     if params["pw"]:
         params["episilon_r"] = 2.5

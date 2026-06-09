@@ -5,12 +5,12 @@ import numpy as np
 import logging
 
 import sys
-from structSim.openmm_helpers import fix_pdb_periodic_boundaries_and_save
+import argparse
+
+from aggrepep.openmm_helpers import fix_pdb_periodic_boundaries_and_save
 
 
 if __name__ == "__main__":
-    import sys
-    import argparse
 
     parser = argparse.ArgumentParser()
     parser.add_argument(   "--input", required=True, help="File to have image molecule")

@@ -264,9 +264,11 @@ def main(params):
         angle_grid = np.arange(-185.0,185.0+dtheta, dtheta)
 
         spacing = 0.5 # nanometer
-        spacing_grid   = np.arange(0.35,0.6+0.02, 0.05)
+        dspacing = 0.05
+        spacing_grid   = np.arange(0.35,0.6+dspacing, dspacing)
         layer_separation = 1.0 # nanometer
-        layer_sep_grid = np.arange(0.8,1.2+0.05, 0.1)
+        dh = 0.1
+        layer_sep_grid = np.arange(0.8,1.35+dh, dh)
 
         nEs = 0 # number of dssp codes indicating (beta) strand/bridge
         max_nEs = -1
