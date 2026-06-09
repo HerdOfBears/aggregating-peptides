@@ -5,6 +5,7 @@ import sys
 from pathlib import Path
 
 import os
+import pickle as pkl
 import argparse
 import logging
 
@@ -27,9 +28,6 @@ def args_parser():
     pass
 
 def sample_generative_model():
-    pass
-
-def fit_gaussian_process():
     pass
 
 def coarse_grained_pw_pathway(sequence, pep_id, out_dir, params, replica_id=1):
@@ -83,7 +81,7 @@ def coarse_grained_pw_pathway(sequence, pep_id, out_dir, params, replica_id=1):
     ###################################################
     _universe = mda.Universe(str(Path(out_dir) / "solvated.gro"), str(Path(out_dir) / "prod.xtc"))
     
-    aggregation_results = analyze_aggregation_trajectory(_universe, sequence, pep_id, out_dir, params=params)
+    aggregation_results = analyze_aggregation_trajectory(_universe, sequence, params=params)
 
     # with open(Path(out_dir) / "analysis_results.json", "w") as f:
     #     json.dump(aggregation_results, f, indent=4)
@@ -216,10 +214,12 @@ def main(params):
     USE_AA = False
     N_ITERATIONS = len(pep_ids)
     
+    ################################################
     # --- initialize BO object with some initial data (can be empty) ---
     # the BO object owns the dataset and the surrogate model, 
     # and implements the BayesOpt logic
     # (except scoring the candidates, which is done below)
+    ################################################
     if USE_BAYES_OPTIMIZATION:
         train_x = torch.rand((2,6))  # 2 initial candidates, 5 design dimensions + 1 fidelity dimension
         train_x[0, -1] = 0.0  # low-fidelity candidate
@@ -236,6 +236,10 @@ def main(params):
     else:
         pep_id_prefix = "peptide-"
 
+
+    ################################################
+    # Main loop over peptides | Main Bayesian Optimization loop (if BO enabled)
+    ################################################
     cumulative_cost = 0.0
     for i in range(N_ITERATIONS):
         if USE_BAYES_OPTIMIZATION:
@@ -246,7 +250,7 @@ def main(params):
             pep_id = i
             pep_id = pep_ids[i]
             seq    = sequences[i]
-            
+
             if new_latent_point[0,BayesOpt.fidelity_col].item() >= 0.5:
                 USE_AA=True
                 print(f"BO iteration {i+1}/{N_ITERATIONS} | Suggested high-fidelity evaluation")
@@ -275,8 +279,11 @@ def main(params):
             os.makedirs(_odir, exist_ok=True)
 
             all_atom_results = all_atom_pathway(   seq, pep_id, _odir, _params, replica_id=_replica_id)
-            with open(_odir / "aa_analysis_results.json", "w") as f:
-                json.dump(all_atom_results, f, indent=4)
+
+            new_scores = torch.tensor([[all_atom_results["agg_prop_score"] + all_atom_results["agg_prop_contact"]]], dtype=torch.double)
+
+            with open(_odir / "aa_analysis_results.pkl", "wb") as f:
+                pkl.dump(all_atom_results, f)
         else:
             print(f"Running coarse-grained pathway for peptide {pep_id}")
             _params = params["coarse_grained_martini"]
@@ -287,18 +294,17 @@ def main(params):
 
             cg_results = coarse_grained_pw_pathway(seq, pep_id, _odir, _params, replica_id=_replica_id)
 
-            with open(_odir / "cg_analysis_results.json", "w") as f:
-                json.dump(cg_results, f, indent=4)
+            new_scores = torch.tensor([[cg_results["SzalaMendyk2023"]["kf"]]], dtype=torch.double)
+
+            with open(_odir / "cg_analysis_results.pkl", "wb") as f:
+                pkl.dump(cg_results, f)
         
-        # --- if using BO, register the new observation (candidate + score) and refit the model ---
+        ################################################
+        # if using BO, register new observation (candidate + score) and refit the model
+        ################################################
         if USE_BAYES_OPTIMIZATION:
             print("Registering new observation to BO and refitting model...")
-            # remember that the last column of new_latent_point is the fidelity level (0 for low-fidelity, 1 for high-fidelity)
-            if USE_AA:
-                new_scores = torch.tensor([[all_atom_results["agg_prop_score"] + all_atom_results["agg_prop_contact"]]], dtype=torch.double)
-            else:
-                new_scores = torch.tensor([[cg_results["SzalaMendyk2023"]["kf"]]], dtype=torch.double)
-
+            # remember: the last column of new_latent_point is the fidelity level (0 for low-fidelity, 1 for high-fidelity)
             BayesOpt.register_observations(new_latent_point, new_scores)
 
 
@@ -311,17 +317,9 @@ if __name__=="__main__":
     parser.add_argument("--smoke_test", action="store_true", help="Whether to run in smoke test mode (overrides parameters to use smaller numbers for quick testing)")
     parser.add_argument("--use_bayes_optimization", action="store_true", help="Whether to use Bayesian Optimization to suggest peptide sequences, or just run through the input file sequentially")
     
-    # simulation argument
-    # parser.add_argument("--ff_toppar_path", required=True, help="Path to toppar/ containing forcefield parameter files")
-    
-    # Boltz 2 arguments
-    # parser.add_argument("--accelerator", choices=["cuda", "opencl", "cpu"], default="cpu", help="Device to run Boltz-2 on (default: cpu).")
-    # parser.add_argument("--recycling_steps", type=int, default=3, help="Number of recycling steps for Boltz-2 (default: 3).")
-    # parser.add_argument("--diffusion_samples", type=int, default=1, help="Number of diffusion samples to generate with Boltz-2 (default: 1).")
-    # parser.add_argument("--override", action='store_true', help="Whether to override existing output directories/files for each peptide.")
-    
     params = parser.parse_args()
     params = vars(params)
+    
     params["accelerator"] = "CPU"
     if params["params_file"]:
         with open(params["params_file"]) as f:
