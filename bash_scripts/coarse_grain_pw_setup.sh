@@ -5,16 +5,30 @@ PROTEIN_PDB=$1
 NRES=$2
 
 # take as argument or default to current directory
+OLD_DIR=$(pwd)
 WDIR=${3:-$(pwd)}
 cd $WDIR
+
+SCRIPT_DIR=$OLD_DIR"/scripts"
+INITIAL_CONFORMATION="monodisperse" # [monodisperse, random]
 
 # usage error message
 if [ "$#" -ne 3 ]; then
     echo "Usage: $0 <protein_pdb_file> <number_of_residues> [working_directory]"
     exit 1
 fi
+if [ ! -f "$PROTEIN_PDB" ]; then
+    echo "Error: Protein PDB file '$PROTEIN_PDB' not found."
+    exit 1
+fi
+# check initial conformaiton choice
+if [ "$INITIAL_CONFORMATION" != "monodisperse" ] && [ "$INITIAL_CONFORMATION" != "random" ]; then
+    echo "Error: Invalid initial conformation choice '$INITIAL_CONFORMATION'. Must be 'monodisperse' or 'random'."
+    exit 1
+fi
 
 VENV_DIR=$HOME/projects/venvs
+# VENV_DIR=$HOME/venvs
 
 SECONDARY_STRUCTURE=$(printf 'E%.0s' $(seq 1 $NRES))
 
@@ -23,8 +37,8 @@ EN_lower=0
 EN_upper=0.85
 
 # insane/simulation box params
-NMOL=50
-BOX_L=15
+NMOL=64
+BOX_L=13.3
 SALT_CONCENTRATION=0.15
 
 # file names
@@ -51,7 +65,28 @@ martinize2 -f $PROTEIN_PDB -x $PROTEIN_CG_PDB -o $PROTEIN_ONLY_TOP \
 
 #############################################
 # make copies of the coarse-grained chain
-gmx insert-molecules -ci $PROTEIN_CG_PDB -nmol $NMOL -box $BOX_L $BOX_L $BOX_L -o $SYSTEM_GRO
+if [ "$INITIAL_CONFORMATION" == "monodisperse" ]; then
+    echo "initial conformation: monodisperse (copies of the same chain)"
+    # center the monomer at the origin (required for -ip absolute positions)
+    gmx editconf -f $PROTEIN_CG_PDB -o ${PROTEIN_NAME}_centered.pdb -center 0 0 0
+
+    # generate lattice positions
+    python $SCRIPT_DIR/generate_lattice_points.py $NMOL $BOX_L positions.dat
+
+    # place monomers at lattice points
+    gmx insert-molecules -ci ${PROTEIN_NAME}_centered.pdb \
+      -ip positions.dat \
+      -nmol $NMOL \
+      -box $BOX_L $BOX_L $BOX_L \
+      -dr 0.1 0.1 0.1 \
+      -o $SYSTEM_GRO
+elif [ "$INITIAL_CONFORMATION" == "random" ]; then
+    echo "initial conformation: random (copies of randomly rotated chains)"
+    gmx insert-molecules -ci $PROTEIN_CG_PDB -nmol $NMOL -box $BOX_L $BOX_L $BOX_L -o $SYSTEM_GRO
+else
+    echo "Error: Invalid initial conformation choice '$INITIAL_CONFORMATION'. Must be 'monodisperse' or 'random'."
+    exit 1
+fi
 
 #############################################
 # copy the .top file from martinize and prepare one for the solvated system
@@ -75,6 +110,7 @@ insane -f $SYSTEM_GRO -o $SOL_GRO \
   -pbc cubic \
   -salt $SALT_CONCENTRATION \
   -sol PW \
+  -x $BOX_L -y $BOX_L -z $BOX_L \
   -d 0 2>&1 | tail -n3 >> $SYSTEM_TOP
 
 # CHANGED: In Martini 2, ion moleculetype names in the itp are typically NA+ and CL-
