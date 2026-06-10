@@ -287,6 +287,8 @@ def main(params):
         # Generate sequence from suggested latent point
         ################################################
         if USE_BAYES_OPTIMIZATION:
+            _seq_latent_point = new_latent_point[:,:BayesOpt.fidelity_col]
+            _fidelity         = new_latent_point[:, BayesOpt.fidelity_col]
             seq = generative_model.decode_latent_point(new_latent_point)
             if len(seq) == 1:
                 seq = seq[0]
