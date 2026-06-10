@@ -234,7 +234,14 @@ class GenerativeModelWrapper():
             _decode_inv_proj = self.generative_model.greedy_decode(candidates_invproj)
             candidate_decoded = _decode_inv_proj 
 
-        candidate_sequences = candidate_decoded
+        # tokens --> sequence
+        _candidate_decoded_lst = candidate_decoded.tolist()
+        candidate_sequences = []
+        for _token_sequence in _candidate_decoded_lst:
+            candidate_sequences.append(
+                self.decode_seq(_token_sequence)
+            )
+        # candidate_sequences = candidate_decoded
 
         return candidate_sequences
 
