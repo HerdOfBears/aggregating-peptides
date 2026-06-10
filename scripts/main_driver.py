@@ -199,7 +199,7 @@ def all_atom_pathway(sequence, pep_id, out_dir, params, replica_id=1):
     return results
 
 def encode_initial_data(df, model):
-    _sequences = df.sequence.toList()
+    _sequences = df.sequence.to_list()
     _fidelities= df.fidelity.to_numpy().reshape(-1,1)
     _scores    = df.score.to_numpy().reshape(-1,1)
 
