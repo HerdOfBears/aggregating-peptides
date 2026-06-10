@@ -78,7 +78,7 @@ class GenerativeModelWrapper():
             elif self.params["encoded_train_data_fpath"].endswith(".npy"):
                 _encoded_train_data = np.load(self.params['encoded_train_data_fpath'])
                 _encoded_train_data = torch.from_numpy(_encoded_train_data)
-                
+
             self.dimensionality_reducer.fit(_encoded_train_data)
 
         elif self.params['dimensionality_reduction']['method'] == "kernel_pca":
@@ -104,7 +104,7 @@ class GenerativeModelWrapper():
         model.params['HARDWARE']= 'cpu'
         model.params["BATCH_SIZE"] = self.bo_params["N_INITIALIZATION_POINTS"]
 
-        model.eval()
+        model.model.eval()
 
         return model
 
