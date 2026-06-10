@@ -129,10 +129,11 @@ class GenerativeModelWrapper():
         """
         # encode sequences to original latent space
         # encoded_seqs = [self.encode_seq(seq) for seq in sequences]
-        encoded_seqs = [seq for seq in sequences]
-        encoded_seqs = torch.tensor(encoded_seqs)
+        # encoded_seqs = [seq for seq in sequences]
+        # encoded_seqs = torch.tensor(encoded_seqs)
+        encoded_seqs = np.array(sequences)
         if len(encoded_seqs.shape) == 1:
-            encoded_seqs = encoded_seqs.unsqueeze(0)
+            encoded_seqs = encoded_seqs.reshape(-1,1)
         
         with torch.no_grad():
             # latent_points = self.generative_model.encode(encoded_seqs)
