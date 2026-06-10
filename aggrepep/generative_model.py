@@ -104,7 +104,8 @@ class GenerativeModelWrapper():
         model.params['HARDWARE']= 'cpu'
         model.params["BATCH_SIZE"] = self.bo_params["N_INITIALIZATION_POINTS"]
 
-        model.tgt_len = 25
+        print(f"WARNING! hardcoding max length to 20")
+        model.tgt_len = 20
 
         model.model.eval()
 
