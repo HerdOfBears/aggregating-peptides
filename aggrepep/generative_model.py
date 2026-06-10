@@ -65,7 +65,7 @@ class GenerativeModelWrapper():
 
         self.generative_model = self.load_generative_model()
         
-        self.char_dict = self.generative_model.params['char_dict']
+        self.char_dict = self.generative_model.params['CHAR_DICT']
         
         if self.params['dimensionality_reduction']['method'] == "pca":
             self.dimensionality_reducer = PCA(
@@ -103,6 +103,8 @@ class GenerativeModelWrapper():
         
         model.params['HARDWARE']= 'cpu'
         model.params["BATCH_SIZE"] = self.bo_params["N_INITIALIZATION_POINTS"]
+
+        model.tgt_len = 25
 
         model.model.eval()
 
