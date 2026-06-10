@@ -73,7 +73,12 @@ class GenerativeModelWrapper():
             )
 
             # fit to encoded training data
-            _encoded_train_data = torch.load(self.params['encoded_train_data_fpath'])
+            if self.params["encoded_train_data_fpath"].endswith(".pt"):
+                _encoded_train_data = torch.load(self.params['encoded_train_data_fpath'])
+            elif self.params["encoded_train_data_fpath"].endswith(".npy"):
+                _encoded_train_data = np.load(self.params['encoded_train_data_fpath'])
+                _encoded_train_data = torch.from_numpy(_encoded_train_data)
+                
             self.dimensionality_reducer.fit(_encoded_train_data)
 
         elif self.params['dimensionality_reduction']['method'] == "kernel_pca":
