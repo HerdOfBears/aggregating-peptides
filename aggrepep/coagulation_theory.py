@@ -365,6 +365,7 @@ def analyze_aggregation_trajectory(universe, sequence, frames_per_ns=10, params=
 
     xframes = np.arange(0, len(_uni.trajectory), 1)
     tvals = xframes / frames_per_ns
+    tvals = tvals.reshape(-1,1)
 
     # coagulation_results = {}
     ktreat_results = {}
