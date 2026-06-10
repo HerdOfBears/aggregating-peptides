@@ -221,7 +221,7 @@ def main(params):
     USE_BAYES_OPTIMIZATION = params["USE_BAYES_OPTIMIZATION"]
     SMOKE_TEST             = params["SMOKE_TEST"]
     USE_AA = False
-    N_ITERATIONS = len(pep_ids)
+    N_ITERATIONS = params["bayesian_optimization"]["iterations"] #len(pep_ids)
     
     ################################################
     # load generative model
@@ -269,9 +269,9 @@ def main(params):
             new_scores = torch.empty((new_latent_point.shape[0], 1), dtype=torch.double)  # placeholder for scores of the new candidates
             print(f"{new_latent_point.shape} candidate(s) suggested by BO with cost {cost:.2f}")
 
-            pep_id = i
-            pep_id = pep_ids[i]
-            seq    = sequences[i]
+            pep_id = f"{pep_id_prefix}{i}"
+            # pep_id = pep_ids[i]
+            # seq    = sequences[i]
 
             if new_latent_point[0,BayesOpt.fidelity_col].item() >= 0.5:
                 USE_AA=True
@@ -299,7 +299,7 @@ def main(params):
 
         # logging.info(f"Processing peptide {pep_id} with sequence {seq}")
         print(f"iteration {i+1}/{N_ITERATIONS} | Processing peptide {pep_id} with sequence {seq}")
-        _odir = Path(params['wdir']) / f"{pep_id_prefix}{pep_id}"
+        _odir = Path(params['wdir']) / f"{pep_id}"
         if not _odir.exists():
             _odir.mkdir(parents=True)
 
