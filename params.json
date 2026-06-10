@@ -1,0 +1,64 @@
+{
+  "generative_model": {
+    "model_type": "transvae",
+    "ckpt_fpath": "data/generative_model/transvae_unorganized_100epochs.ckpt",
+    "char_dict_fpath": "data/generative_model/char_dict.pkl",
+    "encoded_train_data_fpath": "data/generative_model/encoded_train_data_transvae_unorganized_100epochs.npy",
+    "dimensionality_reduction": {
+      "method": "pca",
+      "n_components": 5
+    }
+  },
+  "bayesian_optimization": {
+    "iterations": 20,
+    "acquisition_function": "expected_improvement",
+    "initial_samples": 5,
+    "bounds": {
+      "parameter_1": [0.1, 1.0],
+      "parameter_2": [0.5, 5.0]
+    },
+    "optimization_metric": "rmsd",
+    "random_seed": 42
+  },
+  "coarse_grained_martini": {
+    "arrangement":"parallel",
+    "force_field_path": "outputs/martini",
+    "temperature": 310,
+    "pressure": 1.0,
+    "time_step": 20,
+    "total_npt_time": 2.0,
+    "number_of_steps": 50000,
+    "integration_method": "LangevinIntegrator",
+    "cutoff": 1.1,
+    "coulomb_type": "reaction_field",
+    "vdw_type": "shift",
+    "constraints": "all_bonds",
+    "output_frequency": 5000,
+    "trajectory_file": "prod.xtc",
+    "state_file": "state.csv"
+  },
+  "all_atom_simulation": {
+    "arrangement":"parallel",
+    "force_field": "charmm36_2024",
+    "salt_concentration": 0.15,
+    "temperature": 310,
+    "pressure": 1.0,
+    "time_step": 2,
+    "total_equilibration_time": 2.0,
+    "total_npt_time": 2.0,
+    "number_of_steps": 50000,
+    "integration_method": "LangevinMiddleIntegrator",
+    "temperature_coupling": 1.0,
+    "cutoff": 1.2,
+    "coulomb_type": "pme",
+    "vdw_type": "shift",
+    "constraints": "h_bonds",
+    "thermostat": "langevin",
+    "barostat": "monte_carlo",
+    "output_frequency": 1000,
+    "trajectory_file": "aa_trajectory.dcd",
+    "energy_file": "aa_energy.out",
+    "box_padding": -1.0,
+    "platform": "OpenCL"
+  }
+}
