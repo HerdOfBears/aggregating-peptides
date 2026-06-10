@@ -198,6 +198,17 @@ def all_atom_pathway(sequence, pep_id, out_dir, params, replica_id=1):
 
     return results
 
+def encode_initial_data(df, model):
+    _sequences = df.sequence.toList()
+    _fidelities= df.fidelity.to_numpy().reshape(-1,1)
+    _scores    = df.score.to_numpy().reshape(-1,1)
+
+    _initial_train_set = model.encode_sequences_to_latent(_sequences)      # (n_sequences, n_reduced_dim)
+    train_x =  np.concatenate([_initial_train_set, _fidelities], axis=1)   # (n_sequences, n_reduced_dim+1)
+    train_y = _scores
+
+    return train_x, train_y
+
 def main(params):
     
     # df = pd.read_csv(params.input_file)
@@ -218,6 +229,13 @@ def main(params):
     if USE_BAYES_OPTIMIZATION:
         generative_model = GenerativeModelWrapper(params["generative_model"], params["bayesian_optimization"])
 
+    # encode initial dataset
+    if USE_BAYES_OPTIMIZATION:
+        df = pd.read_csv(params["bayesian_optimization"]["initial_dataset_fpath"])
+        train_x, train_y = encode_initial_data(df, generative_model)
+        train_x, train_obj = torch.from_numpy(train_x), torch.from_numpy(train_y)
+
+
     ################################################
     # --- initialize BO object with some initial data (can be empty) ---
     # the BO object owns the dataset and the surrogate model, 
@@ -225,15 +243,15 @@ def main(params):
     # (except scoring the candidates, which is done below)
     ################################################
     if USE_BAYES_OPTIMIZATION:
-        train_x = torch.rand((2,6))  # 2 initial candidates, 5 design dimensions + 1 fidelity dimension
-        train_x[0, -1] = 0.0  # low-fidelity candidate
-        train_x[1, -1] = 1.0  # high-fidelity candidate
-        train_obj = torch.tensor(
-            [
-                [25.82],  # low-fidelity score for candidate 1; mj10, SzalaMendyk2023 kf score
-                [0.9878 + 1.1592]   # high-fidelity score for candidate 2 ; mj11 0.9878 + 1.1592 (APcontact + APsasa)
-            ]
-        )
+        # train_x = torch.rand((2,6))  # 2 initial candidates, 5 design dimensions + 1 fidelity dimension
+        # train_x[0, -1] = 0.0  # low-fidelity candidate
+        # train_x[1, -1] = 1.0  # high-fidelity candidate
+        # train_obj = torch.tensor(
+        #     [
+        #         [25.82],  # low-fidelity score for candidate 1; mj10, SzalaMendyk2023 kf score
+        #         [0.9878 + 1.1592]   # high-fidelity score for candidate 2 ; mj11 0.9878 + 1.1592 (APcontact + APsasa)
+        #     ]
+        # )
         print(f"Initializing Bayesian Optimization with train_x: {train_x.shape} and train_obj: {train_obj.shape}")
         BayesOpt = MultiFidelityBO_Wu2019KG(train_x, train_obj, params={"PROBLEM_DIM": 5, "SMOKE_TEST": SMOKE_TEST, "BATCH_SIZE": 1})
         pep_id_prefix = "bo-peptide-"
@@ -272,7 +290,7 @@ def main(params):
             seq = generative_model.decode_latent_point(new_latent_point)
             if len(seq) == 1:
                 seq = seq[0]
-                
+
             # logging.info(f"BO iteration {i+1}/{N_ITERATIONS} | decoded sequence = {seq}.")
             print(f"BO iteration {i+1}/{N_ITERATIONS} | decoded sequence = {seq}.")
 
