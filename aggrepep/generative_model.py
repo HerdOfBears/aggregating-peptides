@@ -227,6 +227,7 @@ class GenerativeModelWrapper():
             candidates_invproj = torch.from_numpy(candidates_invproj)
 
         candidates_invproj = candidates_invproj.reshape(-1, candidates_invproj.shape[-1]) # (n_restarts, 1, d_latent) -> (n_restarts, d_latent)
+        candidates_invproj = candidates_invproj.float()
 
         # decode from latent space --> sequence space
         with torch.no_grad():
