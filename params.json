@@ -10,6 +10,7 @@
     }
   },
   "bayesian_optimization": {
+    "jobname":"test-run",
     "initial_dataset_fpath": "data/bayesian_optimization/initial_dataset.csv",
     "N_INITIALIZATION_POINTS":2,
     "iterations": 2,
@@ -28,7 +29,7 @@
     "temperature": 310,
     "pressure": 1.0,
     "time_step": 20,
-    "total_npt_time": 2.0,
+    "total_npt_time": 200.0,
     "number_of_steps": 50000,
     "integration_method": "LangevinIntegrator",
     "cutoff": 1.1,
@@ -47,7 +48,7 @@
     "pressure": 1.0,
     "time_step": 2,
     "total_equilibration_time": 2.0,
-    "total_npt_time": 2.0,
+    "total_npt_time": 100.0,
     "number_of_steps": 50000,
     "integration_method": "LangevinMiddleIntegrator",
     "temperature_coupling": 1.0,
