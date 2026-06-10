@@ -138,7 +138,11 @@ class GenerativeModelWrapper():
         with torch.no_grad():
             # latent_points = self.generative_model.encode(encoded_seqs)
             z, mu, logvar = self.generative_model.calc_mems(encoded_seqs, log=False, save=False)
-        latent_points = mu.cpu().numpy()
+        
+        if isinstance(mu, np.ndarray):
+            latent_points = mu
+        else:
+            latent_points = mu.cpu().numpy()
 
         # project from original latent space to reduced latent space
         latent_points_reduced = self.dimensionality_reducer.transform(latent_points)
