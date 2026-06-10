@@ -289,7 +289,8 @@ def main(params):
         if USE_BAYES_OPTIMIZATION:
             _seq_latent_point = new_latent_point[:,:BayesOpt.fidelity_col]
             _fidelity         = new_latent_point[:, BayesOpt.fidelity_col]
-            seq = generative_model.decode_latent_point(_seq_latent_point)
+
+            seq = generative_model.decode_latent_point(_seq_latent_point.float())
             if len(seq) == 1:
                 seq = seq[0]
 
