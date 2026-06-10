@@ -15,6 +15,7 @@ import numpy as np
 import MDAnalysis as mda
 
 from aggrepep.bayesian_optimization import MultiFidelityBO_Wu2019KG
+from aggrepep.generative_model import GenerativeModelWrapper
 
 from aggrepep.coagulation_theory import analyze_aggregation_trajectory
 from aggrepep.analysis import (
@@ -25,9 +26,6 @@ from aggrepep.analysis import (
 )
 
 def args_parser():
-    pass
-
-def sample_generative_model():
     pass
 
 def coarse_grained_pw_pathway(sequence, pep_id, out_dir, params, replica_id=1):
@@ -215,6 +213,12 @@ def main(params):
     N_ITERATIONS = len(pep_ids)
     
     ################################################
+    # load generative model
+    ################################################
+    if USE_BAYES_OPTIMIZATION:
+        generative_model = GenerativeModelWrapper(params["generative_model"], params["bayesian_optimization"])
+
+    ################################################
     # --- initialize BO object with some initial data (can be empty) ---
     # the BO object owns the dataset and the surrogate model, 
     # and implements the BayesOpt logic
@@ -260,6 +264,17 @@ def main(params):
         else:
             pep_id = pep_ids[i]
             seq    = sequences[i]
+
+        ################################################
+        # Generate sequence from suggested latent point
+        ################################################
+        if USE_BAYES_OPTIMIZATION:
+            seq = generative_model.decode_latent_point(new_latent_point)
+            if len(seq) == 1:
+                seq = seq[0]
+                
+            # logging.info(f"BO iteration {i+1}/{N_ITERATIONS} | decoded sequence = {seq}.")
+            print(f"BO iteration {i+1}/{N_ITERATIONS} | decoded sequence = {seq}.")
 
         # logging.info(f"Processing peptide {pep_id} with sequence {seq}")
         print(f"iteration {i+1}/{N_ITERATIONS} | Processing peptide {pep_id} with sequence {seq}")
