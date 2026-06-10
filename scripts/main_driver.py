@@ -263,11 +263,20 @@ def main(params):
     # Main loop over peptides | Main Bayesian Optimization loop (if BO enabled)
     ################################################
     cumulative_cost = 0.0
+    bayesopt_results={
+        "sequences":[],
+        "fidelity" :[],
+        "score"    :[],
+        "cumulative_cost":[],
+    }
+
     for i in range(N_ITERATIONS):
         if USE_BAYES_OPTIMIZATION:
             new_latent_point, cost = BayesOpt.suggest()
             new_scores = torch.empty((new_latent_point.shape[0], 1), dtype=torch.double)  # placeholder for scores of the new candidates
             print(f"{new_latent_point.shape} candidate(s) suggested by BO with cost {cost:.2f}")
+
+            cumulative_cost += cost
 
             pep_id = f"{pep_id_prefix}{i}"
             # pep_id = pep_ids[i]
@@ -342,6 +351,18 @@ def main(params):
             print("Registering new observation to BO and refitting model...")
             # remember: the last column of new_latent_point is the fidelity level (0 for low-fidelity, 1 for high-fidelity)
             BayesOpt.register_observations(new_latent_point, new_scores)
+
+            bayesopt_results["sequences"].append( seq )
+            bayesopt_results["fidelity" ].append( _fidelity )
+            bayesopt_results["score"    ].append( new_scores.item() )
+            bayesopt_results["cumulative_cost"].append( cumulative_cost )
+    
+    if USE_BAYES_OPTIMIZATION:
+        bo_jobname = params["bayesian_optimization"]["jobname"]
+        output_fpath = f"outputs/{bo_jobname}_bo_results.pkl"
+        print(f"writing BayesOpt results to {output_fpath}")
+        with open(output_fpath, "wb") as fobj:
+            pkl.dump(bayesopt_results, fobj)
 
 
 
