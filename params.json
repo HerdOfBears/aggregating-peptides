@@ -12,7 +12,7 @@
   "bayesian_optimization": {
     "initial_dataset_fpath": "data/bayesian_optimization/initial_dataset.csv",
     "N_INITIALIZATION_POINTS":2,
-    "iterations": 20,
+    "iterations": 2,
     "acquisition_function": "expected_improvement",
     "initial_samples": 5,
     "bounds": {
