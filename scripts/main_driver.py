@@ -121,7 +121,7 @@ def all_atom_pathway(sequence, pep_id, out_dir, params, replica_id=1):
         "--input_dir", wDir,
         "--output_dir", wDir,
         "--job_name", jobName,
-        "--platform_name", params["accelerator"],
+        "--platform_name", params["platform"],
         "--params_file", "params.json",
         "--random_seed", str(randomSeed)
     ])
