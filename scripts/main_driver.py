@@ -292,6 +292,11 @@ def main(params):
             pep_id = pep_ids[i]
             seq    = sequences[i]
 
+        if SMOKE_TEST:
+            USE_AA=True
+            print("forcing high-fidelity")
+            logging.info("hardcoded forcing of high-fidelity")
+
         ################################################
         # Generate sequence from suggested latent point
         ################################################
