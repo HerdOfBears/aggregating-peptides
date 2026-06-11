@@ -144,7 +144,7 @@ def all_atom_pathway(sequence, pep_id, out_dir, params, replica_id=1):
         "--output_dir", wDir,
         "--job_name", jobName,
         "--params_file", paramsFile,
-        "--platform_name", params["accelerator"],
+        "--platform_name", params["platform"],
         "--random_seed", str(randomSeed)
     ], check=True)
 
@@ -159,7 +159,7 @@ def all_atom_pathway(sequence, pep_id, out_dir, params, replica_id=1):
     subprocess.run([
         sys.executable,  # Use the current Python interpreter
         str(script_fix_pbcs),
-        "--input", str(Path(wDir) / trajFile),
+        "--input",  str(Path(wDir) / trajFile),
         "--output", str(Path(wDir) / trajFileNW),
         "--topology", str(Path(wDir) / topFile)
     ], check=True)
