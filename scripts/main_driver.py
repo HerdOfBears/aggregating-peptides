@@ -49,7 +49,7 @@ def coarse_grained_pw_pathway(sequence, pep_id, out_dir, params, replica_id=1):
     ###################################################
     # Step 2: set up the CG PW simulation
     ###################################################
-    print(f"Setting up CG PW simulation for peptide {pep_id} in {out_dir}")
+    logging.info(f"Setting up CG PW simulation for peptide {pep_id} in {out_dir}")
     cg_pw_setup_script = Path("bash_scripts/coarse_grain_pw_setup.sh")
     _monomer_pdb = f"{pep_id}.pdb"
     _seq_length = len(sequence)
@@ -63,7 +63,7 @@ def coarse_grained_pw_pathway(sequence, pep_id, out_dir, params, replica_id=1):
     ###################################################
     # step 3: run a simulation 
     ###################################################
-    print(f"Running simulation for {pep_id} (replica {replica_id})")
+    logging.info(f"Running simulation for {pep_id} (replica {replica_id})")
     run_script = Path("scripts/test_run_martini_openmm.py")
     subprocess.run([
         sys.executable,  # Use the current Python interpreter
@@ -252,7 +252,7 @@ def main(params):
         #         [0.9878 + 1.1592]   # high-fidelity score for candidate 2 ; mj11 0.9878 + 1.1592 (APcontact + APsasa)
         #     ]
         # )
-        print(f"Initializing Bayesian Optimization with train_x: {train_x.shape} and train_obj: {train_obj.shape}")
+        logging.info(f"Initializing Bayesian Optimization with train_x: {train_x.shape} and train_obj: {train_obj.shape}")
         BayesOpt = MultiFidelityBO_Wu2019KG(train_x, train_obj, params={"PROBLEM_DIM": 5, "SMOKE_TEST": SMOKE_TEST, "BATCH_SIZE": 1})
         pep_id_prefix = "bo-peptide-"
     else:
@@ -274,7 +274,7 @@ def main(params):
         if USE_BAYES_OPTIMIZATION:
             new_latent_point, cost = BayesOpt.suggest()
             new_scores = torch.empty((new_latent_point.shape[0], 1), dtype=torch.double)  # placeholder for scores of the new candidates
-            print(f"{new_latent_point.shape} candidate(s) suggested by BO with cost {cost:.2f}")
+            logging.info(f"{new_latent_point.shape} candidate(s) suggested by BO with cost {cost:.2f}")
 
             cumulative_cost += cost
 
@@ -284,10 +284,10 @@ def main(params):
 
             if new_latent_point[0,BayesOpt.fidelity_col].item() >= 0.5:
                 USE_AA=True
-                print(f"BO iteration {i+1}/{N_ITERATIONS} | Suggested high-fidelity evaluation")
+                logging.info(f"BO iteration {i+1}/{N_ITERATIONS} | Suggested high-fidelity evaluation")
             else:
                 USE_AA=False
-                print(f"BO iteration {i+1}/{N_ITERATIONS} | Suggested low-fidelity evaluation")
+                logging.info(f"BO iteration {i+1}/{N_ITERATIONS} | Suggested low-fidelity evaluation")
         else:
             pep_id = pep_ids[i]
             seq    = sequences[i]
@@ -304,10 +304,10 @@ def main(params):
                 seq = seq[0]
 
             # logging.info(f"BO iteration {i+1}/{N_ITERATIONS} | decoded sequence = {seq}.")
-            print(f"BO iteration {i+1}/{N_ITERATIONS} | decoded sequence = {seq}.")
+            logging.info(f"BO iteration {i+1}/{N_ITERATIONS} | decoded sequence = {seq}.")
 
         # logging.info(f"Processing peptide {pep_id} with sequence {seq}")
-        print(f"iteration {i+1}/{N_ITERATIONS} | Processing peptide {pep_id} with sequence {seq}")
+        logging.info(f"iteration {i+1}/{N_ITERATIONS} | Processing peptide {pep_id} with sequence {seq}")
         _odir = Path(params['wdir']) / f"{pep_id}"
         if not _odir.exists():
             _odir.mkdir(parents=True)
@@ -316,7 +316,7 @@ def main(params):
         # run either the CG PW pathway or the all-atom pathway
         ################################################
         if USE_AA:
-            print(f"Running all-atom pathway for peptide {pep_id}")
+            logging.info(f"Running all-atom pathway for peptide {pep_id}")
             _params = params["all_atom_simulation"]
 
             _replica_id = 1
@@ -330,7 +330,7 @@ def main(params):
             with open(_odir / "aa_analysis_results.pkl", "wb") as f:
                 pkl.dump(all_atom_results, f)
         else:
-            print(f"Running coarse-grained pathway for peptide {pep_id}")
+            logging.info(f"Running coarse-grained pathway for peptide {pep_id}")
             _params = params["coarse_grained_martini"]
 
             _replica_id = 1
@@ -348,7 +348,7 @@ def main(params):
         # if using BO, register new observation (candidate + score) and refit the model
         ################################################
         if USE_BAYES_OPTIMIZATION:
-            print("Registering new observation to BO and refitting model...")
+            logging.info("Registering new observation to BO and refitting model...")
             # remember: the last column of new_latent_point is the fidelity level (0 for low-fidelity, 1 for high-fidelity)
             BayesOpt.register_observations(new_latent_point, new_scores)
 
@@ -360,10 +360,9 @@ def main(params):
     if USE_BAYES_OPTIMIZATION:
         bo_jobname = params["bayesian_optimization"]["jobname"]
         output_fpath = f"outputs/{bo_jobname}_bo_results.pkl"
-        print(f"writing BayesOpt results to {output_fpath}")
+        logging.info(f"writing BayesOpt results to {output_fpath}")
         with open(output_fpath, "wb") as fobj:
             pkl.dump(bayesopt_results, fobj)
-
 
 
 if __name__=="__main__":
@@ -398,5 +397,25 @@ if __name__=="__main__":
         params["USE_BAYES_OPTIMIZATION"] = True
     else:
         params["USE_BAYES_OPTIMIZATION"] = False
+
+    smoke_test = params["SMOKE_TEST"]
+
+    os.makedirs("logs/", exist_ok=True)
+    n_log_files = len(os.listdir("logs/"))
+
+    log_prefix  = f"{n_log_files:04}"
+    if smoke_test:
+        log_prefix = f"smoke_test_{log_prefix}"
+    else:
+        log_prefix = f"bayesopt_run_{log_prefix}"
+
+    log_fname = f"{log_prefix}.log"
+    logging.basicConfig(
+        filename=os.path.join("logs/", log_fname),
+        level=logging.INFO, 
+        format='%(asctime)s - %(levelname)s - %(message)s'
+    )
+    logging.info(f"=================== Starting main loop {smoke_test=}===================")
+    logging.info(f"")
 
     main(params)
