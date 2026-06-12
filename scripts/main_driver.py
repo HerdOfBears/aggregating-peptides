@@ -143,12 +143,12 @@ def all_atom_pathway(sequence, pep_id, out_dir, params, replica_id=1):
 
     ###############
     # load equilibrated system file
-    equilibrated_system_pdb = PDBFile( os.path.join(params['input_dir'], params['input_pdb']) )
+    equilibrated_system_pdb = PDBFile( os.path.join(params['input_dir'], inputFile) )
 
     logging.info(f"Starting npt production run...")
     npt_production_run(equilibrated_system_pdb, params)
     logging.info(f"finished npt production run.")
-    
+
     # script_production = Path("scripts/run_production.py")
     # subprocess.run([
     #     sys.executable,  # Use the current Python interpreter
@@ -270,6 +270,8 @@ def main(params):
         logging.info(f"Initializing Bayesian Optimization with train_x: {train_x.shape} and train_obj: {train_obj.shape}")
         BayesOpt = MultiFidelityBO_Wu2019KG(train_x, train_obj, params={"PROBLEM_DIM": 5, "SMOKE_TEST": SMOKE_TEST, "BATCH_SIZE": 1})
         pep_id_prefix = "bo-peptide-"
+        if SMOKE_TEST:
+            pep_id_prefix = "smoke-test-peptide-"
     else:
         pep_id_prefix = "peptide-"
 
@@ -307,11 +309,6 @@ def main(params):
             pep_id = pep_ids[i]
             seq    = sequences[i]
 
-        if SMOKE_TEST:
-            USE_AA=True
-            print("forcing high-fidelity")
-            logging.info("hardcoded forcing of high-fidelity")
-
         ################################################
         # Generate sequence from suggested latent point
         ################################################
@@ -322,8 +319,14 @@ def main(params):
             seq = generative_model.decode_latent_point(_seq_latent_point.float())
             if len(seq) == 1:
                 seq = seq[0]
+            
+            if SMOKE_TEST:
+                USE_AA=True
+                seq = "KGNITINITI"
+                print("forcing high-fidelity")
+                logging.info("hardcoded forcing of high-fidelity")
+                logging.info(f"Using hard-coded mj seq-variant as smoke test sequence=KGNITINITI")
 
-            # logging.info(f"BO iteration {i+1}/{N_ITERATIONS} | decoded sequence = {seq}.")
             logging.info(f"BO iteration {i+1}/{N_ITERATIONS} | decoded sequence = {seq}.")
 
         # logging.info(f"Processing peptide {pep_id} with sequence {seq}")
