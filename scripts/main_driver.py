@@ -361,6 +361,7 @@ def main(params):
             bayesopt_results["fidelity" ].append( _fidelity )
             bayesopt_results["score"    ].append( new_scores.item() )
             bayesopt_results["cumulative_cost"].append( cumulative_cost )
+            logging.info(f"BO iteration {i+1}/{N_ITERATIONS} | {seq=}, {_fidelity=},score={ new_scores.item() }, {cumulative_cost=}")
     
     if USE_BAYES_OPTIMIZATION:
         bo_jobname = params["bayesian_optimization"]["jobname"]
