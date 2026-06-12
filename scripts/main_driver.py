@@ -14,6 +14,9 @@ import pandas as pd
 import numpy as np
 import MDAnalysis as mda
 
+from openmm.app import PDBFile
+from aggrepep.openmm_helpers import npt_production_run
+
 from aggrepep.bayesian_optimization import MultiFidelityBO_Wu2019KG
 from aggrepep.generative_model import GenerativeModelWrapper
 
@@ -133,20 +136,32 @@ def all_atom_pathway(sequence, pep_id, out_dir, params, replica_id=1):
     inputFile=f"{jobName}solvated_system._pbcFixed.pdb"
     checkpointFile=f"{jobName}nvt_npt_equilibrated_system.xml"
     paramsFile="params.json"
+    params["job_name"] = f"{jobPrefix}_rs{randomSeed}_"
+    params["output_dir"] = out_dir
+    params[ "input_dir"] = out_dir
+    params["checkpoint_fname"] = checkpointFile # <--the important one for npt production run function
 
-    script_production = Path("scripts/run_production.py")
-    subprocess.run([
-        sys.executable,  # Use the current Python interpreter
-        str(script_production),
-        "--input_pdb", inputFile,
-        "--checkpoint_fname", checkpointFile,
-        "--input_dir", wDir,
-        "--output_dir", wDir,
-        "--job_name", jobName,
-        "--params_file", paramsFile,
-        "--platform_name", params["platform"],
-        "--random_seed", str(randomSeed)
-    ], check=True)
+    ###############
+    # load equilibrated system file
+    equilibrated_system_pdb = PDBFile( os.path.join(params['input_dir'], params['input_pdb']) )
+
+    logging.info(f"Starting npt production run...")
+    npt_production_run(equilibrated_system_pdb, params)
+    logging.info(f"finished npt production run.")
+    
+    # script_production = Path("scripts/run_production.py")
+    # subprocess.run([
+    #     sys.executable,  # Use the current Python interpreter
+    #     str(script_production),
+    #     "--input_pdb", inputFile,
+    #     "--checkpoint_fname", checkpointFile,
+    #     "--input_dir", wDir,
+    #     "--output_dir", wDir,
+    #     "--job_name", jobName,
+    #     "--params_file", paramsFile,
+    #     "--platform_name", params["platform"],
+    #     "--random_seed", str(randomSeed)
+    # ], check=True)
 
     ##########################################
     # Step 4: Run analysis
