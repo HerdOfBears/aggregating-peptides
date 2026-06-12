@@ -62,6 +62,7 @@
     "trajectory_file": "aa_trajectory.dcd",
     "energy_file": "aa_energy.out",
     "box_padding": -1.0,
-    "platform": "OpenCL"
+    "platform": "OpenCL",
+    "random_seed":42,
   }
 }
