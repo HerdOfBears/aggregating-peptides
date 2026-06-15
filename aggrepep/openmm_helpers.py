@@ -213,6 +213,20 @@ def fix_pdb_periodic_boundaries_and_save(pdb_file, output_file=None, topology_fi
     >>> fix_pdb_periodic_boundaries('system.pdb', 'system_fixed.pdb')
     >>> fix_pdb_periodic_boundaries('solvated.pdb', anchor_molecules='resname LIG')
     """
+
+    # check if the topology file is only protein. 
+    # If not filter and save a new, protein-only file, then
+    # use that one.
+    if protein_only:
+        _t = md.load(topology_file)
+        if _t.n_atoms>30_000:
+            _t = _t.topology.select("protein")
+            _new_topology_file = topology_file.replace(".pdb","_protein.pdb") 
+            _t.save(
+                _new_topology_file
+            )
+            topology_file = _new_topology_file
+
     # Load the PDB file
     _file_suffix = pdb_file.split(".")[-1]
     if _file_suffix == "dcd":
