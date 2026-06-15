@@ -348,7 +348,7 @@ def main(params):
 
             all_atom_results = all_atom_pathway(   seq, pep_id, _odir, _params, replica_id=_replica_id)
 
-            new_scores = torch.tensor([[all_atom_results["agg_prop_score"] + all_atom_results["agg_prop_contact"]]], dtype=torch.double)
+            new_scores = torch.tensor([[all_atom_results["agg_prop_score"][0] + all_atom_results["agg_prop_contact"]]], dtype=torch.double)
 
             with open(_odir / "aa_analysis_results.pkl", "wb") as f:
                 pkl.dump(all_atom_results, f)
