@@ -219,12 +219,11 @@ def fix_pdb_periodic_boundaries_and_save(pdb_file, output_file=None, topology_fi
     # use that one.
     if protein_only:
         _t = md.load(topology_file)
-        if _t.n_atoms>30_000:
-            _t = _t.topology.select("protein")
-            _new_topology_file = topology_file.replace(".pdb","_protein.pdb") 
-            _t.save(
-                _new_topology_file
-            )
+        if _t.n_atoms > 30_000:
+            protein_idx = _t.topology.select("protein")
+            _t = _t.atom_slice(protein_idx)
+            _new_topology_file = topology_file.replace(".pdb", "_protein.pdb")
+            _t.save(_new_topology_file)
             topology_file = _new_topology_file
 
     # Load the PDB file
