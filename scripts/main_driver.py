@@ -168,7 +168,7 @@ def all_atom_pathway(sequence, pep_id, out_dir, params, replica_id=1):
     ##########################################
     trajFile=f"{jobName}npt_production_system_traj.dcd"
     topFile=f"{jobName}solvated_system._pbcFixed.pdb"
-    trajFileNW=f"{jobName}npt_production_system_traj_pbcfix.dcd"
+    trajFileNW=f"{jobName}npt_production_system_traj_pbcFixed.dcd"
     
     script_fix_pbcs = Path("scripts/fix_pbcs.py")
     subprocess.run([
