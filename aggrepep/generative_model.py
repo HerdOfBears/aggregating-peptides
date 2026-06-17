@@ -227,9 +227,7 @@ class GenerativeModelWrapper():
             original_device = latent_point_candidates.device
             latent_cpu = latent_point_candidates
         candidates_invproj = self.dimensionality_reducer.inverse_transform(latent_cpu)
-        
-        candidates_invproj = torch.from_numpy(candidates_invproj).to(original_device)
-            
+                    
         if verbose:
             print(f"candidate in reduced space: {latent_cpu}")
             print(f"candidate in original space: {candidates_invproj}")
@@ -237,6 +235,7 @@ class GenerativeModelWrapper():
         if isinstance(candidates_invproj, np.ndarray):
             candidates_invproj = torch.from_numpy(candidates_invproj)
 
+        candidates_invproj = candidates_invproj.to(original_device)
         candidates_invproj = candidates_invproj.reshape(-1, candidates_invproj.shape[-1]) # (n_restarts, 1, d_latent) -> (n_restarts, d_latent)
         candidates_invproj = candidates_invproj.float()
 
