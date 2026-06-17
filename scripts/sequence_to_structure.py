@@ -1,3 +1,4 @@
+import warnings
 import Bio.PDB
 import PeptideBuilder
 from PeptideBuilder import Geometry
@@ -440,6 +441,8 @@ def main(params):
 
 
 if __name__ == "__main__":
+    warnings.filterwarnings("ignore")
+    
     parser = argparse.ArgumentParser(description="Generate a structure from a sequence and arrangement")
     parser.add_argument("--sequence", type=str, required=True, help="Amino acid sequence (1-letter code)")
     parser.add_argument("--sequence_id", type=str, required=True, help="Identifier for the sequence (used in output filename)")
