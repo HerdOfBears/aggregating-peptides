@@ -12,6 +12,7 @@ import os
 import logging
 import numpy as np
 import mdtraj as md
+import MDAnalysis as mda
 
 AMINO_ACIDS_1to3 = {
     'A': 'ALA',
@@ -218,13 +219,14 @@ def fix_pdb_periodic_boundaries_and_save(pdb_file, output_file=None, topology_fi
     # If not filter and save a new, protein-only file, then
     # use that one.
     if protein_only:
-        _t = md.load(topology_file)
-        if _t.n_atoms > 30_000:
-            protein_idx = _t.topology.select("protein")
-            _t = _t.atom_slice(protein_idx)
-            _new_topology_file = topology_file.replace(".pdb", "_protein.pdb")
-            _t.save(_new_topology_file)
-            topology_file = _new_topology_file
+        _top = mda.Universe(topology_file)
+        _new_topology_file = topology_file.replace(".pdb", "_protein.pdb")
+        _top.select_atoms("protein").write(_new_topology_file)
+        topology_file = _new_topology_file
+        # _t = md.load(topology_file)
+        # if _t.n_atoms > 30_000:
+            # protein_idx = _t.topology.select("protein")
+            # _t = _t.atom_slice(protein_idx)
 
     # Load the PDB file
     _file_suffix = pdb_file.split(".")[-1]
