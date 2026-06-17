@@ -17,7 +17,9 @@ import logging
 def main(params):
 
     test_dir = params["wdir"]
-    platform = Platform.getPlatformByName("OpenCL")
+    platform = Platform.getPlatformByName(
+        params.get("platform","OpenCL")
+    )
     properties = {'Precision': 'double'}
 
     SAVE_EVERY = params.get("output_frequency", 5000)
