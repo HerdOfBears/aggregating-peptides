@@ -277,95 +277,136 @@ def main(params):
         best_spacing = 0
         best_separa  = 0
 
+        _layer_sep = layer_sep_grid[-1]
         for _spacing in spacing_grid:
             logging.info(f"on {_spacing=}")
-            for _layer_sep in layer_sep_grid:
+            
+            _t0 = time.time()
+            for _theta in angle_grid:
                 
-                _t0 = time.time()
-                for _theta in angle_grid:
-                    
-                    rotated_positions = positions#rotate_around_length_axis(topology, positions, (_theta/180)*np.pi)
-                    
-                    twist_top, twist_pos = build_sandwich(
-                        topology, 
-                        rotated_positions, 
-                        num_sheets=2, 
-                        nchains_per_sheet=2, 
-                        spacing=_spacing, 
-                        layer_separation=_layer_sep,
-                        pattern=arrangement,
-                        theta=_theta
-                    )
+                rotated_positions = positions#rotate_around_length_axis(topology, positions, (_theta/180)*np.pi)
+                
+                twist_top, twist_pos = build_sandwich(
+                    topology, 
+                    rotated_positions, 
+                    num_sheets=2, 
+                    nchains_per_sheet=2, 
+                    spacing=_spacing, 
+                    layer_separation=_layer_sep,
+                    pattern=arrangement,
+                    theta=_theta
+                )
 
-                    _hydrophobic_burial = check_hydrophobic_burial(
-                        twist_top, 
-                        twist_pos, 
-                        chain_sheet1="A", 
-                        chain_sheet2="C",
-                        exclude_termini=1,
-                        verbose=False
-                    )
-                    if _hydrophobic_burial["buried_score"]+_hydrophobic_burial["exposed_score"]>0:
-                        if _hydrophobic_burial['buried_fraction']<0.5:
-                            continue
-                    
-                    do_chainsAB_overlap = check_for_overlap(
-                        twist_top, 
-                        twist_pos, 
-                        chain1="A",
-                        chain2="B",
-                        bbox_atoms="all",
-                        tolerance=0.0,
-                        verbose=False,
-                        method=overlap_check_method
-                    )
-                
-                    do_chainsAK_overlap = check_for_overlap(
-                        twist_top, 
-                        twist_pos, 
-                        chain1="A",
-                        chain2="C",
-                        bbox_atoms="all",
-                        tolerance=0.0,
-                        verbose=False,
-                        method=overlap_check_method
-                    )
-                    
-                    if do_chainsAB_overlap or do_chainsAK_overlap:
+                _hydrophobic_burial = check_hydrophobic_burial(
+                    twist_top, 
+                    twist_pos, 
+                    chain_sheet1="A", 
+                    chain_sheet2="C",
+                    exclude_termini=1,
+                    verbose=False
+                )
+                if _hydrophobic_burial["buried_score"]+_hydrophobic_burial["exposed_score"]>0:
+                    if _hydrophobic_burial['buried_fraction']<0.5:
                         continue
-                    
-                    twist_top, twist_pos = build_sandwich(
-                        topology, 
-                        rotated_positions, 
-                        num_sheets=2, 
-                        nchains_per_sheet=10, 
-                        spacing=_spacing, 
-                        layer_separation=_layer_sep,
-                        pattern=arrangement,
-                        theta=_theta
-                    )
-                    
-                    twist_pos_lst = []
-                    for _vec in twist_pos:
-                        _lst = [_vec.x, _vec.y, _vec.z]
-                        twist_pos_lst.append(_lst)
                 
-                    _traj = mdt.Trajectory(twist_pos_lst, openmm_to_mdtraj_topology(twist_top) )
-                    
-                    _dssp_results = mdt.compute_dssp(_traj)
-                    
-                    nEs = np.sum(_dssp_results=="E")
-                    if nEs>=max_nEs:
-                        logging.info(f"beta strand number: {nEs=}")
-                        max_nEs=nEs
-                        best_theta = _theta
-                        best_spacing = _spacing
-                        best_separa  = _layer_sep
-                        logging.info(f"{best_theta=}, {best_spacing=}, {best_separa=}, {arrangement=}")
+                do_chainsAB_overlap = check_for_overlap(
+                    twist_top, 
+                    twist_pos, 
+                    chain1="A",
+                    chain2="B",
+                    bbox_atoms="all",
+                    tolerance=0.0,
+                    verbose=False,
+                    method=overlap_check_method
+                )
+            
+                do_chainsAK_overlap = check_for_overlap(
+                    twist_top, 
+                    twist_pos, 
+                    chain1="A",
+                    chain2="C",
+                    bbox_atoms="all",
+                    tolerance=0.0,
+                    verbose=False,
+                    method=overlap_check_method
+                )
+                
+                if do_chainsAB_overlap or do_chainsAK_overlap:
+                    continue
+                
+                twist_top, twist_pos = build_sandwich(
+                    topology, 
+                    rotated_positions, 
+                    num_sheets=2, 
+                    nchains_per_sheet=5, 
+                    spacing=_spacing, 
+                    layer_separation=_layer_sep,
+                    pattern=arrangement,
+                    theta=_theta
+                )
+                
+                twist_pos_lst = []
+                for _vec in twist_pos:
+                    _lst = [_vec.x, _vec.y, _vec.z]
+                    twist_pos_lst.append(_lst)
+            
+                _traj = mdt.Trajectory(twist_pos_lst, openmm_to_mdtraj_topology(twist_top) )
+                
+                _dssp_results = mdt.compute_dssp(_traj)
+                
+                nEs = np.sum(_dssp_results=="E")
+                if nEs>=max_nEs:
+                    logging.info(f"beta strand number: {nEs=}")
+                    max_nEs=nEs
+                    best_theta = _theta
+                    best_spacing = _spacing
+                    best_separa  = _layer_sep
+                    logging.info(f"{best_theta=}, {best_spacing=}, {best_separa=}, {arrangement=}")
 
 
-                _tf = time.time()
-                logging.info(f"time to finish angle grid = {_tf-_t0}s")
+            _tf = time.time()
+            logging.info(f"time to finish angle grid = {_tf-_t0}s")
+
+        # now bring closer together
+        best_separa = _layer_sep
+        for _layer_sep in layer_sep_grid[::-1]: #[::-1] for reverse order (larger -> smaller)
+                
+            rotated_positions = positions
+            twist_top, twist_pos = build_sandwich(
+                topology, 
+                rotated_positions, 
+                num_sheets=2, 
+                nchains_per_sheet=2, 
+                spacing=best_spacing, 
+                layer_separation=_layer_sep,
+                pattern=arrangement,
+                theta=best_theta
+            )
+            
+            do_chainsAB_overlap = check_for_overlap(
+                twist_top, 
+                twist_pos, 
+                chain1="A",
+                chain2="B",
+                bbox_atoms="all",
+                tolerance=0.0,
+                verbose=False,
+                method=overlap_check_method
+            )
+        
+            do_chainsAK_overlap = check_for_overlap(
+                twist_top, 
+                twist_pos, 
+                chain1="A",
+                chain2="C",
+                bbox_atoms="all",
+                tolerance=0.0,
+                verbose=False,
+                method=overlap_check_method
+            )
+            if do_chainsAB_overlap or do_chainsAK_overlap:
+                best_separa = _layer_sep
+                break
 
         logging.info("Best values found:")
         logging.info(f"{max_nEs=}, {best_theta=}, {best_spacing=}, {best_separa=}, {arrangement=}")
@@ -442,7 +483,7 @@ def main(params):
 
 if __name__ == "__main__":
     warnings.filterwarnings("ignore")
-    
+
     parser = argparse.ArgumentParser(description="Generate a structure from a sequence and arrangement")
     parser.add_argument("--sequence", type=str, required=True, help="Amino acid sequence (1-letter code)")
     parser.add_argument("--sequence_id", type=str, required=True, help="Identifier for the sequence (used in output filename)")
