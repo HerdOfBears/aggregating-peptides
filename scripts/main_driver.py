@@ -74,6 +74,7 @@ def coarse_grained_pw_pathway(sequence, pep_id, out_dir, params, replica_id=1):
         "--gro", str(Path(out_dir) / "solvated.gro"),
         "--top", str(Path(out_dir) / "system.top"),
         "--wdir", str(out_dir),
+        "--pw",
         "--params_file", str(Path("params.json"))
     ], check=True)
 
@@ -383,7 +384,7 @@ def main(params):
     
     if USE_BAYES_OPTIMIZATION:
         bo_jobname = params["bayesian_optimization"]["jobname"]
-        output_fpath = f"outputs/{bo_jobname}_bo_results.pkl"
+        output_fpath = f"{params['wdir']}/{bo_jobname}_bo_results.pkl"
         logging.info(f"writing BayesOpt results to {output_fpath}")
         with open(output_fpath, "wb") as fobj:
             pkl.dump(bayesopt_results, fobj)
