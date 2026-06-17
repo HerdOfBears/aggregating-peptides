@@ -7,7 +7,8 @@
     "dimensionality_reduction": {
       "method": "pca",
       "n_components": 5
-    }
+    },
+    "tgt_len":15
   },
   "bayesian_optimization": {
     "jobname":"test-run",
@@ -38,7 +39,8 @@
     "constraints": "all_bonds",
     "output_frequency": 5000,
     "trajectory_file": "prod.xtc",
-    "state_file": "state.csv"
+    "state_file": "state.csv",
+    "platform":"OpenCL"
   },
   "all_atom_simulation": {
     "arrangement":"parallel",
@@ -63,6 +65,6 @@
     "energy_file": "aa_energy.out",
     "box_padding": -1.0,
     "platform": "OpenCL",
-    "random_seed":42,
+    "random_seed":42
   }
 }
