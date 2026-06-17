@@ -104,7 +104,7 @@ class GenerativeModelWrapper():
         model.params['HARDWARE']= 'cpu'
         model.params["BATCH_SIZE"] = self.bo_params["N_INITIALIZATION_POINTS"]
 
-        print(f"WARNING! hardcoding max length to 20")
+        print(f"WARNING! hardcoding max length to {self.params['tgt_len']}")
         model.tgt_len = self.params["tgt_len"]
 
         model.model.eval()
@@ -235,7 +235,7 @@ class GenerativeModelWrapper():
         if isinstance(candidates_invproj, np.ndarray):
             candidates_invproj = torch.from_numpy(candidates_invproj)
 
-        candidates_invproj = candidates_invproj.to(original_device)
+        # candidates_invproj = candidates_invproj.to(original_device)
         candidates_invproj = candidates_invproj.reshape(-1, candidates_invproj.shape[-1]) # (n_restarts, 1, d_latent) -> (n_restarts, d_latent)
         candidates_invproj = candidates_invproj.float()
 
