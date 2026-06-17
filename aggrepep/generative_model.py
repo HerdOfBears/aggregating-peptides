@@ -105,7 +105,7 @@ class GenerativeModelWrapper():
         model.params["BATCH_SIZE"] = self.bo_params["N_INITIALIZATION_POINTS"]
 
         print(f"WARNING! hardcoding max length to 20")
-        model.tgt_len = 20
+        model.tgt_len = self.params["tgt_len"]
 
         model.model.eval()
 
@@ -218,10 +218,20 @@ class GenerativeModelWrapper():
         # inverse projection from reduced space to original latent space
         # if the dimensionality reducer is an identity function,
         # this will simply return the input candidates without modification
-        candidates_invproj = self.dimensionality_reducer.inverse_transform(latent_point_candidates)
+        
+        # sklearn needs CPU
+        if torch.is_tensor(latent_point_candidates):
+            original_device = latent_point_candidates.device
+            latent_cpu = latent_point_candidates.detach().cpu()
+        else:
+            original_device = latent_point_candidates.device
+            latent_cpu = latent_point_candidates
+        candidates_invproj = self.dimensionality_reducer.inverse_transform(latent_cpu)
+        
+        candidates_invproj = torch.from_numpy(candidates_invproj).to(original_device)
             
         if verbose:
-            print(f"candidate in reduced space: {latent_point_candidates}")
+            print(f"candidate in reduced space: {latent_cpu}")
             print(f"candidate in original space: {candidates_invproj}")
 
         if isinstance(candidates_invproj, np.ndarray):
