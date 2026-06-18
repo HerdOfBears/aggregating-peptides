@@ -418,7 +418,7 @@ def main(inputs, params):
     # Persist a small run-level summary of where everything landed.
     os.makedirs("outputs", exist_ok=True)
     jobname = params.get("jobname", "sim_driver")
-    output_fpath = f"{params['wdir']}}/{jobname}_batch_driver_results.pkl"
+    output_fpath = f"{params['wdir']}/{jobname}_batch_driver_results.pkl"
     logging.info(f"writing driver summary to {output_fpath}")
     with open(output_fpath, "wb") as fobj:
         pkl.dump(driver_results, fobj)
