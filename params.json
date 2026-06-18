@@ -37,6 +37,8 @@
     "coulomb_type": "reaction_field",
     "vdw_type": "shift",
     "constraints": "all_bonds",
+    "neutral_nterminus":"n",
+    "neutral_cterminus":"n",
     "output_frequency": 5000,
     "trajectory_file": "prod.xtc",
     "state_file": "state.csv",
