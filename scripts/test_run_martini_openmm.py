@@ -23,7 +23,7 @@ def main(params):
     properties = {'Precision': 'double'}
 
     SAVE_EVERY = params.get("output_frequency", 5000)
-    RANDOM_SEED = params.get("random_seed", 42)
+    RANDOM_SEED = params.get("random_seed", 42) + params.get("replica_id", 0)
     temperature= params.get("temperature", 310) # in Kelvin
     pressure   = params.get("pressure", 1.0) # in bar
     step_size  = params.get("time_step", 20) # in fs
