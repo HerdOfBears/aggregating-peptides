@@ -7,8 +7,8 @@ NRES=$2
 # take as argument or default to current directory
 OLD_DIR=$(pwd)
 WDIR=${3:-$(pwd)}
-AcNtermini=${4:"n"} # whether to use an effective Acetylated N-termini or not
-amidateCtermini=${5:"n"} # whether to use an effective C-terminus amidation or not
+AcNtermini=${4:-"n"} # whether to use an effective Acetylated N-termini or not
+amidateCtermini=${5:-"n"} # whether to use an effective C-terminus amidation or not
 cd $WDIR
 
 SCRIPT_DIR=$OLD_DIR"/scripts"
