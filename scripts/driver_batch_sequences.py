@@ -91,7 +91,8 @@ def coarse_grained_pw_pathway(sequence, pep_id, out_dir, params, replica_id=1):
         "--gro", str(Path(out_dir) / "solvated.gro"),
         "--top", str(Path(out_dir) / "system.top"),
         "--wdir", str(out_dir),
-        "--params_file", str(Path("params.json"))
+        "--params_file", str(Path("params.json")),
+        "--pw"
     ], check=True)
 
     ###################################################
