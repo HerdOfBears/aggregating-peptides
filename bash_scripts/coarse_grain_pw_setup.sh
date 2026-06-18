@@ -7,6 +7,8 @@ NRES=$2
 # take as argument or default to current directory
 OLD_DIR=$(pwd)
 WDIR=${3:-$(pwd)}
+AcNtermini=${4:"n"} # whether to use an effective Acetylated N-termini or not
+amidateCtermini=${5:"n"} # whether to use an effective C-terminus amidation or not
 cd $WDIR
 
 SCRIPT_DIR=$OLD_DIR"/scripts"
@@ -57,11 +59,19 @@ echo "ignoring hydrogens in inputted structure (martinize2 -ignh ...)"
 #############################################
 # martinize with Elastic Network model
 # CHANGED: -ff martini22 (Martini 2.2 protein params, compatible with 2.3P polarizable water)
-martinize2 -f $PROTEIN_PDB -x $PROTEIN_CG_PDB -o $PROTEIN_ONLY_TOP \
-  -ff martini22 -p backbone -ss "$SECONDARY_STRUCTURE" \
-  -elastic -el $EN_lower -eu $EN_upper \
-  -noscfix \
-  -ignh
+common_args=(-f "$PROTEIN_PDB" -x "$PROTEIN_CG_PDB" -o "$PROTEIN_ONLY_TOP"
+             -ff martini22 -p backbone -ss "$SECONDARY_STRUCTURE"
+             -elastic -el $EN_lower -eu $EN_upper -noscfix -ignh)
+
+if [[ "$AcNtermini" == "y" && "$amidateCtermini" == "y" ]]; then
+    martinize2 "${common_args[@]}" -nt          # neutral termini at both ends
+elif [[ "$AcNtermini" == "y" ]]; then
+    martinize2 "${common_args[@]}" -nter NH2-ter
+elif [[ "$amidateCtermini" == "y" ]]; then
+    martinize2 "${common_args[@]}" -cter COOH-ter
+else
+    martinize2 "${common_args[@]}"
+fi
 
 #############################################
 # make copies of the coarse-grained chain
