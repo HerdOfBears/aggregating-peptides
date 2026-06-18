@@ -34,7 +34,7 @@ def args_parser():
 def coarse_grained_pw_pathway(sequence, pep_id, out_dir, params, replica_id=1):
 
     shutil.copytree(params["force_field_path"], out_dir / "martini")
-
+    params["replica_id"] = replica_id
     ##################################################
     # Step 1: build structure from sequence using sequence_to_structure.py    
     ###################################################
@@ -61,6 +61,8 @@ def coarse_grained_pw_pathway(sequence, pep_id, out_dir, params, replica_id=1):
         _monomer_pdb,
         str(_seq_length),
         str(out_dir),
+        "y" if params["neutral_nterminus"] else "n",
+        "y" if params["neutral_cterminus"] else "n"
     ], check=True)
 
     ###################################################
