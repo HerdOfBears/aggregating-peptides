@@ -1,14 +1,10 @@
 """
 Simulation driver script.
 
-Adapted from the Bayesian-Optimization driver: ALL Bayesian-optimization logic
+Adapted from the Bayesian-Optimization main_driver, but all Bayesian-optimization logic
 has been removed. This version simply runs molecular simulations for a set of
 input sequences. For every sequence it launches `params["n_jobs"]` replicates,
 which run *concurrently* (sharing a single GPU when one is available).
-
-Style / imports mirror the original driver, minus the BO-specific dependencies
-(GenerativeModelWrapper, encode_initial_data, MultiFidelityBO_Wu2019KG, torch),
-which are no longer needed.
 """
 
 import os
@@ -91,7 +87,7 @@ def coarse_grained_pw_pathway(sequence, pep_id, out_dir, params, replica_id=1):
         "--gro", str(Path(out_dir) / "solvated.gro"),
         "--top", str(Path(out_dir) / "system.top"),
         "--wdir", str(out_dir),
-        "--params_file", str(Path("params.json")),
+        "--params_file", str(Path(params["params_file"])),
         "--pw"
     ], check=True)
 
@@ -101,9 +97,6 @@ def coarse_grained_pw_pathway(sequence, pep_id, out_dir, params, replica_id=1):
     _universe = mda.Universe(str(Path(out_dir) / "solvated.gro"), str(Path(out_dir) / "prod.xtc"))
     
     aggregation_results = analyze_aggregation_trajectory(_universe, sequence, params=params)
-
-    # with open(Path(out_dir) / "analysis_results.json", "w") as f:
-    #     json.dump(aggregation_results, f, indent=4)
 
     return aggregation_results
 
@@ -167,20 +160,6 @@ def all_atom_pathway(sequence, pep_id, out_dir, params, replica_id=1):
     npt_production_run(equilibrated_system_pdb, params)
     logging.info(f"finished npt production run.")
 
-    # script_production = Path("scripts/run_production.py")
-    # subprocess.run([
-    #     sys.executable,  # Use the current Python interpreter
-    #     str(script_production),
-    #     "--input_pdb", inputFile,
-    #     "--checkpoint_fname", checkpointFile,
-    #     "--input_dir", wDir,
-    #     "--output_dir", wDir,
-    #     "--job_name", jobName,
-    #     "--params_file", paramsFile,
-    #     "--platform_name", params["platform"],
-    #     "--random_seed", str(randomSeed)
-    # ], check=True)
-
     ##########################################
     # Step 4: Run analysis
     ##########################################
@@ -196,20 +175,6 @@ def all_atom_pathway(sequence, pep_id, out_dir, params, replica_id=1):
         "--output", str(Path(wDir) / trajFileNW),
         "--topology", str(Path(wDir) / topFile)
     ], check=True)
-
-    # script_AP_analysis = Path("scripts/run_AP_analysis.py")
-    # analysisResults = params["all_atom_analysis_results"]
-    # subprocess.run([
-    #     sys.executable,  # Use the current Python interpreter
-    #     str(script_AP_analysis),
-    #     "--pepid", pep_id,
-    #     "--sequence", sequence,
-    #     "--wdir", wDir,
-    #     "--traj", trajFileNW,
-    #     "--top", f"{pep_id}_parallel.pdb",
-    #     "--rseed", str(randomSeed),
-    #     "--dataset_file", analysisResults
-    # ], check=True)
 
     _top_fpath  = str(Path(wDir) / f"{pep_id}_parallel.pdb")
     _traj_fpath = str(Path(wDir) / trajFileNW)
@@ -233,7 +198,7 @@ def all_atom_pathway(sequence, pep_id, out_dir, params, replica_id=1):
 
 def _gpu_available(params):
     """
-    Decide whether a GPU is available for the simulations.
+    Decide whether a GPU is available for the simulations. NOTE need to update to use torch or something to properly check available gpus
 
     We key off the requested accelerator. OpenMM-style GPU platforms are
     CUDA / OpenCL / HIP; CPU / Reference are not GPU platforms. Replace this
@@ -249,16 +214,15 @@ def _run_replicate(task):
 
     `task` is a plain tuple of picklable values so that it survives the
     spawn-based process boundary (everything is re-pickled into the child).
-
-    Careful notes (this is the part the request asked to be careful about):
+    
+    notes:
       * One *process* per replicate (not a thread): each simulation gets an
         isolated Python/OpenMM state. Combined with the "spawn" start method
-        (see main), this avoids the classic CUDA/OpenCL "cannot re-initialize
-        in a forked subprocess" failure that happens with fork() + GPU.
-      * All `n_jobs` replicates target the SAME GPU. They share it via the
+        (see main)
+      * All `n_jobs` replicates target the same GPU. They share it via the
         driver's time-slicing (or CUDA MPS if configured). You are responsible
         for making sure `n_jobs` concurrent simulations actually fit in GPU
-        memory -- nothing here enforces that.
+        memory -- nothing here enforces/checks that.
       * The parent's logging config does NOT propagate to spawned children, so
         each replicate (re)configures logging to its own file inside its output
         dir. Because each child is a separate process, there is no cross-process
@@ -270,10 +234,14 @@ def _run_replicate(task):
     if use_aa:
         pathway_tag = "aa"
         _params = params["all_atom_simulation"]
+        _params["params_file"] = params["params_file"]
         results_fname = "aa_analysis_results.pkl"
     else:
         pathway_tag = "cg"
         _params = params["coarse_grained_martini"]
+        _params["params_file"] = params["params_file"]
+        _params["neutral_nterminus"] = params["neutral_nterminus"]
+        _params["neutral_cterminus"] = params["neutral_cterminus"]
         results_fname = "cg_analysis_results.pkl"
 
     _odir = base_odir / pathway_tag / f"replica-{replica_id}"
@@ -338,11 +306,11 @@ def main(inputs, params):
         Run parameters. Must contain "n_jobs": the number of replicates to run
         per sequence, which is ALSO the number of replicates run concurrently.
     """
-    params["accelerator"] = "OpenCL"  # mirror the original main() override; edit as needed
+    params["accelerator"] = params["coarse_grained_martini"]['platform']
 
     SMOKE_TEST = params["SMOKE_TEST"]
     # Pathway selection used to be driven by BO fidelity. Without BO we default
-    # to the coarse-grained pathway (the original non-BO behavior) unless the
+    # to the coarse-grained pathway unless the
     # caller explicitly opts into the all-atom pathway.
     USE_AA = params.get("USE_AA", False)
 
@@ -362,8 +330,8 @@ def main(inputs, params):
             f"(time-sliced, or via CUDA MPS if configured). Ensure they fit in GPU memory."
         )
 
-    # 'spawn' start method: GPU contexts (CUDA/OpenCL) do NOT survive fork(), so
-    # spawning fresh interpreters is the safe way to run several GPU simulations
+    # 'spawn' start method: makes fresh interpreters 
+    # as a safe way to run several GPU simulations
     # concurrently from a single parent process.
     mp_ctx = multiprocessing.get_context("spawn")
 
@@ -393,8 +361,8 @@ def main(inputs, params):
 
         rep_summaries = []
         # max_workers == n_jobs: all replicates for this sequence run at once.
-        # A fresh executor per sequence keeps GPU concurrency capped at n_jobs and
-        # avoids mixing replicates from different sequences on the device.
+        # A fresh executor per pep_id keeps GPU concurrency capped at n_jobs and
+        # avoids mixing replicates from different pep_ids on the device.
         with ProcessPoolExecutor(max_workers=n_jobs, mp_context=mp_ctx) as executor:
             future_to_rep = {executor.submit(_run_replicate, t): t[2] for t in tasks}
             for fut in as_completed(future_to_rep):
