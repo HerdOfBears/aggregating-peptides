@@ -64,6 +64,7 @@ def coarse_grained_pw_pathway(sequence, pep_id, out_dir, params, replica_id=1):
     # Step 2: set up the CG PW simulation
     ###################################################
     logging.info(f"Setting up CG PW simulation for peptide {pep_id} in {out_dir}")
+    logging.info(f"{params['neutral_nterminus']=} | {params['neutral_cterminus']=}")
     cg_pw_setup_script = Path("bash_scripts/coarse_grain_pw_setup.sh")
     _monomer_pdb = f"{pep_id}.pdb"
     _seq_length = len(sequence)
@@ -121,7 +122,7 @@ def all_atom_pathway(sequence, pep_id, out_dir, params, replica_id=1):
     ##########################################
     # Step 2: Run equilibation: energy min, nvt and npt equilibrations
     ##########################################
-    randomSeed=42
+    randomSeed=42+int(replica_id)
     jobPrefix=f"{pep_id}_parallel"
     jobName=f"{jobPrefix}_rs{randomSeed}"
     wDir=out_dir
@@ -433,6 +434,11 @@ if __name__ == "__main__":
 
     smoke_test = params["SMOKE_TEST"]
 
+    if ( params.get("USE_AA","n")=="y"):
+        params["USE_AA"]=True
+    else:
+        params["USE_AA"]=False
+
     os.makedirs("logs/", exist_ok=True)
     n_log_files = len(os.listdir("logs/"))
 
@@ -472,6 +478,35 @@ if __name__ == "__main__":
          "K"+"GSGS"+I10,
         "KK"+"GSGS"+I10,
     ]
+    params["neutral_cterminus"]=False
+    params["neutral_nterminus"]=False
+    pep_ids = [
+        "mj1",
+        "mj2",
+        "mj3",
+        "mj4",
+        "mj5",
+        "mj6",
+        "mj7",
+        "mj8",
+        "mj9",
+        "mj10",
+        "mj11"
+    ]
+    sequences = [
+       "KSNAVFVANSE",
+       "NKSFVALISEN",
+       "TKSAIILSST",
+       "TKSFAILSET", 
+       "KSNAVFVANS",
+       "SNKAVFVAENS",
+       "KGSGSSNAVFVANS",
+       "KGSGSNSFVALISN",
+       "KGSGSTSFAILST",
+       "KGSGSNITINITI",
+       "KGSGSNFTINFTI"
+    ]
+
     inputs = {pid: seq for seq, pid in zip(sequences, pep_ids)}
 
     logging.info(f"=================== Starting simulation driver {smoke_test=} | n_jobs={params['n_jobs']} ===================")
