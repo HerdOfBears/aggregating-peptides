@@ -68,13 +68,17 @@ def coarse_grained_pw_pathway(sequence, pep_id, out_dir, params, replica_id=1):
     cg_pw_setup_script = Path("bash_scripts/coarse_grain_pw_setup.sh")
     _monomer_pdb = f"{pep_id}.pdb"
     _seq_length = len(sequence)
+    _nmol=params.get("nmol", 64)
+    _boxL=params.get("box_L",13.3)
     subprocess.run([
         str(cg_pw_setup_script),
         _monomer_pdb,
         str(_seq_length),
         str(out_dir),
         "y" if params["neutral_nterminus"] else "n",
-        "y" if params["neutral_cterminus"] else "n"
+        "y" if params["neutral_cterminus"] else "n",
+        _nmol,
+        _boxL
     ], check=True)
 
     ###################################################
