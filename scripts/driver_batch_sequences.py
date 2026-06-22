@@ -77,8 +77,8 @@ def coarse_grained_pw_pathway(sequence, pep_id, out_dir, params, replica_id=1):
         str(out_dir),
         "y" if params["neutral_nterminus"] else "n",
         "y" if params["neutral_cterminus"] else "n",
-        _nmol,
-        _boxL
+        str(_nmol),
+        str(_boxL)
     ], check=True)
 
     ###################################################
