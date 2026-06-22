@@ -18,8 +18,8 @@ SCRIPT_DIR=$OLD_DIR"/scripts"
 INITIAL_CONFORMATION="monodisperse" # [monodisperse, random]
 
 # usage error message
-if [ "$#" -ne 5 ]; then
-    echo "Usage: $0 <protein_pdb_file> <number_of_residues> <working_directory> <whether_to_neutralize_Nterminus> <whether_to_neutralize_Cterminus>"
+if [ "$#" -ne 7 ]; then
+    echo "Usage: $0 <protein_pdb_file> <number_of_residues> <working_directory> <whether_to_neutralize_Nterminus> <whether_to_neutralize_Cterminus> <number of molecules> <cubic box length (nm)>"
     exit 1
 fi
 if [ ! -f "$PROTEIN_PDB" ]; then
