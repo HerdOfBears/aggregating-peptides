@@ -9,6 +9,9 @@ OLD_DIR=$(pwd)
 WDIR=${3:-$(pwd)}
 AcNtermini=${4:-"n"} # whether to use an effective Acetylated N-termini or not
 amidateCtermini=${5:-"n"} # whether to use an effective C-terminus amidation or not
+NMOL=${6:-64}
+BOX_L=${7:-13.3}
+
 cd $WDIR
 
 SCRIPT_DIR=$OLD_DIR"/scripts"
@@ -30,7 +33,7 @@ if [ "$INITIAL_CONFORMATION" != "monodisperse" ] && [ "$INITIAL_CONFORMATION" !=
 fi
 
 VENV_DIR=$HOME/projects/venvs
-# VENV_DIR=$HOME/venvs
+VENV_DIR=$HOME/venvs
 
 SECONDARY_STRUCTURE=$(printf 'E%.0s' $(seq 1 $NRES))
 
@@ -39,8 +42,8 @@ EN_lower=0
 EN_upper=0.85
 
 # insane/simulation box params
-NMOL=64
-BOX_L=13.3
+#NMOL=64
+#BOX_L=13.3
 SALT_CONCENTRATION=0.15
 
 # file names
