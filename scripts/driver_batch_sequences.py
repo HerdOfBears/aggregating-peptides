@@ -340,8 +340,13 @@ def main(inputs, params):
     # concurrently from a single parent process.
     mp_ctx = multiprocessing.get_context("spawn")
 
-    driver_results = {}  # pep_id -> list of per-replicate summaries
+    _Ac_present=False
+    for _id in inputs.keys():
+        if "-Ac-" in _id:
+            _Ac_present=True
+            break
 
+    driver_results = {}  # pep_id -> list of per-replicate summaries
     for pep_id, seq in inputs.items():
         logging.info(f"Processing peptide {pep_id} | seq={seq} | launching {n_jobs} replicate(s)")
 
@@ -351,12 +356,13 @@ def main(inputs, params):
         # the concurrent workers (each replica subdir is unique per worker).
         (base_odir / ("aa" if USE_AA else "cg")).mkdir(parents=True, exist_ok=True)
         
-        if "-Ac-" in pep_id:
-            params["neutral_nterminus"]=True
-            logging.info(f"using neutral N-terminus: {params['neutral_nterminus']} | using neutral C-terminus: {params['neutral_cterminus']}")
-        else:
-            params["neutral_nterminus"]=False
-            logging.info(f"using neutral N-terminus: {params['neutral_nterminus']} | using neutral C-terminus: {params['neutral_cterminus']}")
+        if _Ac_present:
+            if "-Ac-" in pep_id:
+                params["neutral_nterminus"]=True
+                logging.info(f"using neutral N-terminus: {params['neutral_nterminus']} | using neutral C-terminus: {params['neutral_cterminus']}")
+            else:
+                params["neutral_nterminus"]=False
+                logging.info(f"using neutral N-terminus: {params['neutral_nterminus']} | using neutral C-terminus: {params['neutral_cterminus']}")
 
         # One task per replicate. replica_id is 1-indexed to match the original.
         tasks = [
@@ -464,7 +470,7 @@ if __name__ == "__main__":
     # df = pd.read_csv(params["input_file"])
     # inputs = {pid: seq for seq, pid in zip(df["sequence"], df["pep-id"])}
     ###############################################################
-    params["neutral_cterminus"]=True
+    #params["neutral_cterminus"]=True
     I10 = "SNNFGAILSS"
     pep_ids   = [
         "I10-Ac-EE-cap",
@@ -482,8 +488,8 @@ if __name__ == "__main__":
          "K"+"GSGS"+I10,
         "KK"+"GSGS"+I10,
     ]
-    params["neutral_cterminus"]=False
-    params["neutral_nterminus"]=False
+    params["neutral_cterminus"]=True if params["coarse_grained_martini"]["neutral_cterminus"]=="y" else False
+    params["neutral_nterminus"]=True if params["coarse_grained_martini"]["neutral_nterminus"]=="y" else False
     pep_ids = [
         "mj1",
         "mj2",
