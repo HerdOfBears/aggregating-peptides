@@ -19,8 +19,6 @@ import multiprocessing
 from pathlib import Path
 from concurrent.futures import ProcessPoolExecutor, as_completed
 
-# import pandas as pd  # only needed if you re-enable CSV input loading
-
 import pandas as pd
 import numpy as np
 import MDAnalysis as mda
@@ -408,7 +406,7 @@ def main(inputs, params):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    # parser.add_argument("--input_file", required=True, help="Path to input CSV file containing peptide IDs and sequences")
+    parser.add_argument("--input_file", required=True, help="Path to input CSV file containing peptide IDs and sequences")
     parser.add_argument("--wdir", required=True, help="Working directory path")
     parser.add_argument("--params_file", required=False, default=None, help="Path to JSON file containing parameters. Optional as parameters have defaults.")
     parser.add_argument("--smoke_test", action="store_true", help="Whether to run in smoke test mode (overrides parameters to use smaller numbers for quick testing)")
@@ -465,59 +463,62 @@ if __name__ == "__main__":
         format='%(asctime)s - %(levelname)s - %(message)s'
     )
 
-    ###############################################################
-    # build inputs = {pep_id: sequence} 
-    # df = pd.read_csv(params["input_file"])
-    # inputs = {pid: seq for seq, pid in zip(df["sequence"], df["pep-id"])}
-    ###############################################################
-    #params["neutral_cterminus"]=True
-    I10 = "SNNFGAILSS"
-    pep_ids   = [
-        "I10-Ac-EE-cap",
-        "I10-EE-cap",
-        "I10-E-cap",
-        "I10-Ac-K-cap",
-        "I10-K-cap",
-        "I10-KK-cap",
-    ]
-    sequences = [
-        "EE"+"GSGS"+I10,
-        "EE"+"GSGS"+I10,
-         "E"+"GSGS"+I10,
-         "K"+"GSGS"+I10,
-         "K"+"GSGS"+I10,
-        "KK"+"GSGS"+I10,
-    ]
     params["neutral_cterminus"]=True if params["coarse_grained_martini"]["neutral_cterminus"]=="y" else False
     params["neutral_nterminus"]=True if params["coarse_grained_martini"]["neutral_nterminus"]=="y" else False
-    pep_ids = [
-        "mj1",
-        "mj2",
-        "mj3",
-        "mj4",
-        "mj5",
-        "mj6",
-        "mj7",
-        "mj8",
-        "mj9",
-        "mj10",
-        "mj11"
-    ]
-    sequences = [
-       "KSNAVFVANSE",
-       "NKSFVALISEN",
-       "TKSAIILSST",
-       "TKSFAILSET", 
-       "KSNAVFVANS",
-       "SNKAVFVAENS",
-       "KGSGSSNAVFVANS",
-       "KGSGSNSFVALISN",
-       "KGSGSTSFAILST",
-       "KGSGSNITINITI",
-       "KGSGSNFTINFTI"
-    ]
 
-    inputs = {pid: seq for seq, pid in zip(sequences, pep_ids)}
+    ###############################################################
+    # build inputs = {pep_id: sequence} 
+    df = pd.read_csv(params["input_file"])
+    inputs = {pid: seq for seq, pid in zip(df["sequence"], df["pep-id"])}
+    ###############################################################
+    #params["neutral_cterminus"]=True
+    # I10 = "SNNFGAILSS"
+    # pep_ids   = [
+    #     "I10-Ac-EE-cap",
+    #     "I10-EE-cap",
+    #     "I10-E-cap",
+    #     "I10-Ac-K-cap",
+    #     "I10-K-cap",
+    #     "I10-KK-cap",
+    # ]
+    # sequences = [
+    #     "EE"+"GSGS"+I10,
+    #     "EE"+"GSGS"+I10,
+    #      "E"+"GSGS"+I10,
+    #      "K"+"GSGS"+I10,
+    #      "K"+"GSGS"+I10,
+    #     "KK"+"GSGS"+I10,
+    # ]
+    # params["neutral_cterminus"]=True if params["coarse_grained_martini"]["neutral_cterminus"]=="y" else False
+    # params["neutral_nterminus"]=True if params["coarse_grained_martini"]["neutral_nterminus"]=="y" else False
+    # pep_ids = [
+    #     "mj1",
+    #     "mj2",
+    #     "mj3",
+    #     "mj4",
+    #     "mj5",
+    #     "mj6",
+    #     "mj7",
+    #     "mj8",
+    #     "mj9",
+    #     "mj10",
+    #     "mj11"
+    # ]
+    # sequences = [
+    #    "KSNAVFVANSE",
+    #    "NKSFVALISEN",
+    #    "TKSAIILSST",
+    #    "TKSFAILSET", 
+    #    "KSNAVFVANS",
+    #    "SNKAVFVAENS",
+    #    "KGSGSSNAVFVANS",
+    #    "KGSGSNSFVALISN",
+    #    "KGSGSTSFAILST",
+    #    "KGSGSNITINITI",
+    #    "KGSGSNFTINFTI"
+    # ]
+
+    # inputs = {pid: seq for seq, pid in zip(sequences, pep_ids)}
 
     logging.info(f"=================== Starting simulation driver {smoke_test=} | n_jobs={params['n_jobs']} ===================")
     logging.info(f"")
