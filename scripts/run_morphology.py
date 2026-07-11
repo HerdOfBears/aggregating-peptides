@@ -15,7 +15,8 @@ if __name__=="__main__":
     params = {}
     params["n_chains"] = 64
     params["experiment_dir"] = "../outputs/mj-Ceq45p2-neutral_term/"
-
+    params["experiment_dir"] = "./outputs/morphology-expt-neutral_cterminus/"
+    
     if torch.cuda.is_available():
         device = "cuda:0"
     else:
