@@ -16,7 +16,7 @@ if __name__=="__main__":
     params["n_chains"] = 64
     params["experiment_dir"] = "../outputs/mj-Ceq45p2-neutral_term/"
     params["experiment_dir"] = "./outputs/morphology-expt-neutral_cterminus/"
-    
+
     if torch.cuda.is_available():
         device = "cuda:0"
     else:
@@ -146,10 +146,10 @@ if __name__=="__main__":
         verbose=False
     )
 
-    local_time_step_idx = -1
-    Z_local = reducer.fit_transform(
-        all_H[local_time_step_idx,:].reshape(2*n_chains, -1)
-    )
+    # local_time_step_idx = -1
+    # Z_local = reducer.fit_transform(
+    #     all_H[local_time_step_idx,:].reshape(2*n_chains, -1)
+    # )
 
     min_embd, max_embd = np.array([np.inf]*3), np.array([-np.inf]*3)
     print(f"embedding all {len(all_H)} timesteps into UMAP space")
