@@ -56,7 +56,7 @@ if __name__=="__main__":
     for _dir in os.listdir(experiment_dir):
         if not os.path.isdir(os.path.join(experiment_dir, _dir)):
             continue
-        _replica_dir = os.path.join(experiment_dir, f"{_dir}/replica_1/")
+        _replica_dir = os.path.join(experiment_dir, f"{_dir}/cg/replica-1/")
 
         _top_file = os.path.join(_replica_dir, "solvated.gro")
         _traj_file = os.path.join(_replica_dir, "prod.xtc")
@@ -85,8 +85,9 @@ if __name__=="__main__":
         _traj_file= top_and_traj_files[1]
         output_fname = _top_file.replace(".gro", "_Hist.pkl")
 
-        # if os.path.isfile(filename.replace('.gsd', '_H.pkl')):
-        #     continue
+        if os.path.isfile(output_fname.replace('.gsd', '_Hist.pkl')):
+            print(f"skipping {output_fname} since it already exists")
+            continue
 
         print('processing {:} of {:}, {:s}'.format(j+1, len(gsd_files), _top_file))
         xyz, box, types = read_cg(_top_file, _traj_file, n_chains, frame=0)
@@ -149,23 +150,49 @@ if __name__=="__main__":
         all_H[local_time_step_idx,:].reshape(2*n_chains, -1)
     )
 
-    all_U = []
     min_embd, max_embd = np.array([np.inf]*3), np.array([-np.inf]*3)
     print(f"embedding all {len(all_H)} timesteps into UMAP space")
     print("reducer.fit_transform(), but might be wrong")
-    for i, H in tqdm.tqdm(enumerate(all_H), total=len(all_H)):
+    for j, top_and_traj_files in enumerate(gsd_files):
+        all_U = []
+
+        _top_file = top_and_traj_files[0]
+        _traj_file= top_and_traj_files[1]
+        output_fname = _top_file.replace(".gro", "_Hist.pkl")
+        output_embedding_fname = _top_file.replace(".gro", "_Hist_all_Zlocal.pkl")
+
+        if not os.path.isfile(output_fname.replace('.gsd', '_Hist.pkl')):
+            print(f"skipping {output_fname} since it does not exist")
+            continue
+        if os.path.isfile(output_embedding_fname):
+            print(f"skipping {output_embedding_fname} since it already exists")
+            continue
         
-        embedding = reducer.fit_transform(H.reshape(H.shape[0], -1))
-        
-        all_U.append(embedding)
-        for j,_v in enumerate(np.min(embedding,axis=0)):
-            if _v<min_embd[j]:
-                min_embd[j]=_v
-        for j,_v in enumerate(np.max(embedding,axis=0)):
-            if _v>max_embd[j]:
-                max_embd[j]=_v
+        for i, H in tqdm.tqdm(enumerate(all_H), total=len(all_H)):
+            
+            embedding = reducer.fit_transform(H.reshape(H.shape[0], -1))
+            
+            all_U.append(embedding)
+            for j,_v in enumerate(np.min(embedding,axis=0)):
+                if _v<min_embd[j]:
+                    min_embd[j]=_v
+            for j,_v in enumerate(np.max(embedding,axis=0)):
+                if _v>max_embd[j]:
+                    max_embd[j]=_v
+
+        with open(output_embedding_fname, 'wb') as fid:
+            pkl.dump(all_U, fid)
+    
     print(min_embd)
     print(max_embd)
+    if os.path.isfile(os.path.join(experiment_dir, "min_max_embd.pkl")):
+        # load
+        with open(os.path.join(experiment_dir, "min_max_embd.pkl"), 'rb') as fid:
+            min_embd, max_embd = pkl.load(fid)
+    else:
+        # save
+        with open(os.path.join(experiment_dir, "min_max_embd.pkl"), 'wb') as fid:
+            pkl.dump((min_embd, max_embd), fid)
 
     ##################################################
     ##################################################
@@ -200,14 +227,27 @@ if __name__=="__main__":
     gh.to(device)
 
     fingerprints = []
-    for lam in all_U:
+    for j, top_and_traj_files in enumerate(gsd_files):
+        _top_file = top_and_traj_files[0]
+        _traj_file= top_and_traj_files[1]
+        output_fname = _top_file.replace(".gro", "_Hist.pkl")
+        output_embedding_fname = _top_file.replace(".gro", "_Hist_all_Zlocal.pkl")
 
-        X = torch.tensor(lam.T, device=device)
-        yh = gh(X).to('cpu').detach().numpy()
-        yh = [y.reshape(hbins, hbins).T for y in yh]
-        yh = np.hstack([np.flipud(y) / y.sum() for y in yh])
+        if not os.path.isfile(output_embedding_fname):
+            print(f"skipping {output_embedding_fname} since it does not exist")
+            continue
+        
+        with open(output_embedding_fname, 'rb') as fid:
+            all_U = pkl.load(fid)
 
-        fingerprints.append(yh)
+        for lam in all_U:
+
+            X = torch.tensor(lam.T, device=device)
+            yh = gh(X).to('cpu').detach().numpy()
+            yh = [y.reshape(hbins, hbins).T for y in yh]
+            yh = np.hstack([np.flipud(y) / y.sum() for y in yh])
+
+            fingerprints.append(yh)
 
     ###############################################
     # Embed the global histograms for each timestep
