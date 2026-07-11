@@ -152,7 +152,7 @@ if __name__=="__main__":
     # )
 
     min_embd, max_embd = np.array([np.inf]*3), np.array([-np.inf]*3)
-    print(f"embedding all {len(all_H)} timesteps into UMAP space")
+    # print(f"embedding all {len(all_H)} timesteps into UMAP space")
     print("reducer.fit_transform(), but might be wrong")
     for j, top_and_traj_files in enumerate(gsd_files):
         all_U = []
