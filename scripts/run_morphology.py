@@ -55,8 +55,11 @@ if __name__=="__main__":
     experiment_dir = params["experiment_dir"] 
     gsd_files = []
     for _dir in os.listdir(experiment_dir):
+        if "ipynb" in _dir: 
+            continue
         if not os.path.isdir(os.path.join(experiment_dir, _dir)):
             continue
+        
         for _replica in os.listdir(os.path.join(experiment_dir, f"{_dir}/cg/")):
             _replica_dir = os.path.join(experiment_dir, f"{_dir}/cg/{_replica}/")
             if not os.path.isdir(_replica_dir):
