@@ -57,14 +57,17 @@ if __name__=="__main__":
     for _dir in os.listdir(experiment_dir):
         if not os.path.isdir(os.path.join(experiment_dir, _dir)):
             continue
-        _replica_dir = os.path.join(experiment_dir, f"{_dir}/cg/replica-1/")
-
-        _top_file = os.path.join(_replica_dir, "solvated.gro")
-        _traj_file = os.path.join(_replica_dir, "prod.xtc")
-        if not os.path.isfile(_top_file) or not os.path.isfile(_traj_file):
-            continue
-        gsd_files.append((_top_file, _traj_file))
-    
+        for _replica in os.listdir(os.path.join(experiment_dir, f"{_dir}/cg/")):
+            _replica_dir = os.path.join(experiment_dir, f"{_dir}/cg/{_replica}/")
+            if not os.path.isdir(_replica_dir):
+                continue
+            
+            _top_file  = os.path.join(_replica_dir, "solvated.gro")
+            _traj_file = os.path.join(_replica_dir, "prod.xtc")
+            if not os.path.isfile(_top_file) or not os.path.isfile(_traj_file):
+                continue
+            gsd_files.append((_top_file, _traj_file))
+        
     print(f"found {len(gsd_files)} gsd files in {experiment_dir}")
 
     traj = mda.Universe(gsd_files[0][0], gsd_files[0][1])
