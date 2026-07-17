@@ -156,7 +156,7 @@ if __name__=="__main__":
     # Z_local = reducer.fit_transform(
     #     all_H[local_time_step_idx,:].reshape(2*n_chains, -1)
     # )
-
+    only_last_frame = True # of each replica
     min_embd, max_embd = np.array([np.inf]*3), np.array([-np.inf]*3)
     # print(f"embedding all {len(all_H)} timesteps into UMAP space")
     print("reducer.fit_transform(), but might be wrong")
@@ -174,7 +174,7 @@ if __name__=="__main__":
         else:
             with open(output_fname, 'rb') as fid:
                 all_H = pkl.load(fid)
-                
+
         if os.path.isfile(output_embedding_fname):
             print(f"skipping {output_embedding_fname} since it already exists")
             continue
@@ -251,14 +251,23 @@ if __name__=="__main__":
         with open(output_embedding_fname, 'rb') as fid:
             all_U = pkl.load(fid)
 
-        for lam in all_U:
-
+        if only_last_frame:
+            print(f"embedding only the last frame of {output_embedding_fname}")
+            lam = all_U[-1]
             X = torch.tensor(lam.T, device=device)
             yh = gh(X).to('cpu').detach().numpy()
             yh = [y.reshape(hbins, hbins).T for y in yh]
             yh = np.hstack([np.flipud(y) / y.sum() for y in yh])
 
             fingerprints.append(yh)
+        else:
+            for i,lam in enumerate(all_U):
+                X = torch.tensor(lam.T, device=device)
+                yh = gh(X).to('cpu').detach().numpy()
+                yh = [y.reshape(hbins, hbins).T for y in yh]
+                yh = np.hstack([np.flipud(y) / y.sum() for y in yh])
+
+                fingerprints.append(yh)
 
     ###############################################
     # Embed the global histograms for each timestep
@@ -268,5 +277,10 @@ if __name__=="__main__":
         np.array(fingerprints).reshape(len(fingerprints), -1)
     )
 
-    with open(os.path.join(experiment_dir, "frame_embedding.pkl"), 'wb') as fid:
-        pkl.dump(frame_embedding, fid)
+    if only_last_frame:
+        print(f"writing {os.path.join(experiment_dir, 'frame_embedding_last_frames.pkl')}")
+        with open(os.path.join(experiment_dir, "frame_embedding_last_frames.pkl"), 'wb') as fid:
+            pkl.dump(frame_embedding, fid)
+    else:
+        with open(os.path.join(experiment_dir, "frame_embedding.pkl"), 'wb') as fid:
+            pkl.dump(frame_embedding, fid)
