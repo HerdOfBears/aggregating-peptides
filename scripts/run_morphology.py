@@ -177,6 +177,16 @@ if __name__=="__main__":
 
         if os.path.isfile(output_embedding_fname):
             print(f"skipping {output_embedding_fname} since it already exists")
+            with open(output_embedding_fname, 'rb') as fid:
+                all_U = pkl.load(fid)
+            # get min/max
+            for k,_v in enumerate(np.min(all_U,axis=0)):
+                if _v<min_embd[k]:
+                    min_embd[k]=_v
+            for k,_v in enumerate(np.max(all_U,axis=0)):
+                if _v>max_embd[k]:
+                    max_embd[k]=_v
+
             continue
         
         for i, H in enumerate(all_H):
@@ -184,12 +194,12 @@ if __name__=="__main__":
             embedding = reducer.fit_transform(H.reshape(H.shape[0], -1))
             
             all_U.append(embedding)
-            for j,_v in enumerate(np.min(embedding,axis=0)):
-                if _v<min_embd[j]:
-                    min_embd[j]=_v
-            for j,_v in enumerate(np.max(embedding,axis=0)):
-                if _v>max_embd[j]:
-                    max_embd[j]=_v
+            for k,_v in enumerate(np.min(embedding,axis=0)):
+                if _v<min_embd[k]:
+                    min_embd[k]=_v
+            for k,_v in enumerate(np.max(embedding,axis=0)):
+                if _v>max_embd[k]:
+                    max_embd[k]=_v
 
         with open(output_embedding_fname, 'wb') as fid:
             pkl.dump(all_U, fid)
