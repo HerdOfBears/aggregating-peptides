@@ -180,10 +180,10 @@ if __name__=="__main__":
             with open(output_embedding_fname, 'rb') as fid:
                 all_U = pkl.load(fid)
             # get min/max
-            for k,_v in enumerate(np.min(all_U,axis=0)):
+            for k,_v in enumerate(np.min(np.min(all_U,axis=0),axis=0)):
                 if _v<min_embd[k]:
                     min_embd[k]=_v
-            for k,_v in enumerate(np.max(all_U,axis=0)):
+            for k,_v in enumerate(np.max(np.max(all_U,axis=0),axis=0)):
                 if _v>max_embd[k]:
                     max_embd[k]=_v
 
