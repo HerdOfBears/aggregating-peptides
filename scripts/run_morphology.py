@@ -168,12 +168,13 @@ if __name__=="__main__":
         output_fname = _top_file.replace(".gro", "_Hist.pkl")
         output_embedding_fname = _top_file.replace(".gro", "_Hist_all_Zlocal.pkl")
 
-        if not os.path.isfile(output_fname.replace('.gsd', '_Hist.pkl')):
+        if not os.path.isfile(output_fname):
             print(f"skipping {output_fname} since it does not exist")
             continue
         else:
             with open(output_fname, 'rb') as fid:
                 all_H = pkl.load(fid)
+                
         if os.path.isfile(output_embedding_fname):
             print(f"skipping {output_embedding_fname} since it already exists")
             continue
