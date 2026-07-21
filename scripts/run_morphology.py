@@ -8,14 +8,18 @@ from MDAnalysis.lib import distances, mdamath
 import os
 import pickle as pkl
 import tqdm
+import argparse
+import time
 
 from aggrepep.morphology import SoftHistogram, GaussianHistogram, read_cg
 
+
 if __name__=="__main__":
-    params = {}
-    params["n_chains"] = 64
-    params["experiment_dir"] = "../outputs/mj-Ceq45p2-neutral_term/"
-    params["experiment_dir"] = "./outputs/morphology-expt-neutral_cterminus/"
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--experiment_dir", type=str, required=True, help="The dir where simulation output dirs are stored. Each subdir should contain a 'cg' dir with 'replica_X' dirs with solvated.gro and prod.xtc files.")
+    parser.add_argument("--n_chains", type=int, default=64)
+    args = parser.parse_args()
+    params = vars(args)
 
     if torch.cuda.is_available():
         device = "cuda:0"
@@ -24,6 +28,8 @@ if __name__=="__main__":
 
     device = torch.device(device)
     print(device)
+
+    t0 = time.time()
 
     n_cg = 10
 
@@ -294,3 +300,6 @@ if __name__=="__main__":
     else:
         with open(os.path.join(experiment_dir, "frame_embedding.pkl"), 'wb') as fid:
             pkl.dump(frame_embedding, fid)
+
+    tf = time.time()
+    print(f"total time taken: {tf-t0:.2f} seconds")
