@@ -64,6 +64,62 @@ def add_distance_bw_groups_restraint():
     """
     pass
 
+# function to make simulation object when using parmed/.psf and forcefield files.
+def make_simulation_from_psf(psf_topfile:str,
+                                pdb_crdfile:str,
+                                params:dict,):
+    """
+    Create an OpenMM Simulation object from a ParmEd PSF topology file
+    and a PDB coordinate file.
+    
+    Parameters:
+    -----------
+    psf_topfile : str
+        Path to the PSF topology file.
+    pdb_crdfile : str
+        Path to the PDB coordinate file.
+    params : dict
+        Dictionary containing simulation parameters,
+
+    Returns:
+    --------
+    simulation : openmm.app.Simulation
+        An OpenMM Simulation object ready for running. 
+    """
+
+    psf = CharmmPsfFile(psf_topfile)
+    crd = PDBFile(pdb_crdfile)
+
+    lx, ly, lz = params["box_dimensions"]
+    psf.setBox(lx*nanometer, ly*nanometer, lz*nanometer)
+    assert psf.boxVectors is not None, "box not set -- PME will fail"
+
+    _ff_file_dir = os.path.join("..", os.path.dirname(__file__), "data/aa_simulations/charmm/toppar")
+    ff_params = CharmmParameterSet(
+        os.path.join(_ff_file_dir, 'top_all36_prot.rtf'),
+        os.path.join(_ff_file_dir, 'par_all36m_prot.prm'),
+        os.path.join(_ff_file_dir, 'toppar_water_ions.str'),
+    )
+
+
+    system = psf.createSystem(
+        ff_params,
+        nonbondedMethod=PME,             # NoCutoff for vacuum
+        nonbondedCutoff=1.2*nanometer,
+        constraints=HBonds,
+    )
+    integrator = LangevinMiddleIntegrator(
+        params["temperature"]*kelvin,
+        1/picosecond, 
+        params["time_step"]*femtoseconds
+    )
+    integrator.setRandomNumberSeed(params["random_seed"])
+    
+    simulation = Simulation(psf.topology, system, integrator, Platform.getPlatformByName(params["platform"]))
+    simulation.context.setPositions(crd.positions)
+    
+    return simulation
+
 # Function to add backbone position restraints
 def add_backbone_posres(system, pdb, restraint_force, periodic_boundaries=True):
     if periodic_boundaries:
@@ -386,7 +442,7 @@ def change_protonation_batch(topology:Topology, residues_to_change:list[tuple]):
 
     return variants
 
-def npt_production_run(system_pdb:pdbfile.PDBFile, params:dict):
+def npt_production_run(system_pdb:pdbfile.PDBFile, params:dict, simulation_obj:Simulation=None):
     """
     set up and run the unrestrained NPT simulation ('production run')
     """
@@ -446,50 +502,57 @@ def npt_production_run(system_pdb:pdbfile.PDBFile, params:dict):
 
     platform = Platform.getPlatformByName(platform_name)
 
-    ##############
-    # specify forcefield
-    ##############
-    forcefield = ForceField(f"{forcefield_opt}.xml", f"{forcefield_opt}/water.xml")
+    if simulation_obj is None:
+        logging.info("Creating new simulation object for NPT production run.")
+        ##############
+        # specify forcefield
+        ##############
+        forcefield = ForceField(f"{forcefield_opt}.xml", f"{forcefield_opt}/water.xml")
 
-    ##############
-    # setup system and integrator
-    ##############
-    modeller = Modeller(system_pdb.topology, system_pdb.positions)
-    # modeller.deleteWater()
-    # modeller.addSolvent(
-    #         forcefield, 
-    #         padding=box_padding, 
-    #         positiveIon=positive_ion,
-    #         negativeIon=negative_ion,
-    #         neutralize=True
-    #     )
+        ##############
+        # setup system and integrator
+        ##############
+        modeller = Modeller(system_pdb.topology, system_pdb.positions)
+        # modeller.deleteWater()
+        # modeller.addSolvent(
+        #         forcefield, 
+        #         padding=box_padding, 
+        #         positiveIon=positive_ion,
+        #         negativeIon=negative_ion,
+        #         neutralize=True
+        #     )
 
-    
+        
 
-    # _topology = modeller.topology#system_pdb.getTopology()
-    _topology = system_pdb.getTopology()
-    _positions= modeller.positions#system_pdb.getPositions()
+        # _topology = modeller.topology#system_pdb.getTopology()
+        _topology = system_pdb.getTopology()
+        _positions= modeller.positions#system_pdb.getPositions()
 
-    system = forcefield.createSystem(_topology, 
-                                    nonbondedMethod=PME, 
-                                    nonbondedCutoff=nonbonded_cutoff*nanometer, 
-                                    constraints=HBonds
-    )
-    integrator = LangevinMiddleIntegrator(temperature*kelvin,
-                                        1/picosecond, 
-                                        step_size*femtoseconds
-    )
-    integrator.setRandomNumberSeed(params["random_seed"])
-
-    _barostat = MonteCarloBarostat(pressure*bar, temperature*kelvin)
-    _barostat.setRandomNumberSeed(params["random_seed"])
-    system.addForce(
-            _barostat
+        system = forcefield.createSystem(_topology, 
+                                        nonbondedMethod=PME, 
+                                        nonbondedCutoff=nonbonded_cutoff*nanometer, 
+                                        constraints=HBonds
         )
-    add_backbone_posres(system, system_pdb, 0.0, periodic_boundaries=True)                
-    # simulation.context.reinitialize(preserveState=True) # reinitialize context with additional force
+        integrator = LangevinMiddleIntegrator(temperature*kelvin,
+                                            1/picosecond, 
+                                            step_size*femtoseconds
+        )
+        integrator.setRandomNumberSeed(params["random_seed"])
 
-    simulation = Simulation(_topology, system, integrator, platform)
+        _barostat = MonteCarloBarostat(pressure*bar, temperature*kelvin)
+        _barostat.setRandomNumberSeed(params["random_seed"])
+        system.addForce(
+                _barostat
+            )
+        add_backbone_posres(system, system_pdb, 0.0, periodic_boundaries=True)                
+        # simulation.context.reinitialize(preserveState=True) # reinitialize context with additional force
+
+        simulation = Simulation(_topology, system, integrator, platform)
+    else:
+        logging.info("Using provided simulation object for NPT production run.")
+        simulation = simulation_obj
+        _topology = simulation.topology
+        _positions= simulation.context.getState(getPositions=True).getPositions()
 
 
     if checkpoint_fname:

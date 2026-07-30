@@ -199,10 +199,28 @@ def staged_soft_energy_minimization(simulation:simulation.Simulation):
                 logging.info(f"forceably leaving energy minimization loop {_counter=} > 8")
                 break
 
-def run_equilibration(pdb, params=None):
+def run_equilibration(pdb, params=None, simulation_obj=None):
     """
-    Runs NVT and NPT equilibration for a given PDBFile object . 
+    Runs NVT and NPT equilibration for either 
+        a given PDBFile object, or
+        a given Simulation object.
     Saves the equilibrated checkpoint file, and also a dcd
+
+    Parameters:
+    ----------
+    pdb: openmm.app.pdbfile.PDBFile
+        The PDBFile object to equilibrate.
+        Ignored if a simulation object is provided.
+    params: dict
+        Dictionary of parameters for equilibration.
+    simulation_obj: openmm.app.simulation.Simulation, optional
+        If provided, this simulation object will be used instead of 
+        creating a new one from the PDBFile object.
+    
+    Returns
+    -------
+    simulation: openmm.app.simulation.Simulation
+        The simulation object after NVT and NPT equilibration.
     """
     nvt_equilibration_time = 100*picoseconds
     npt_equilibration_time = 100*picoseconds
@@ -270,109 +288,121 @@ def run_equilibration(pdb, params=None):
     logging.info(f"total_n_equilibriation_steps (NVT, NPT) = {total_nvt_equilibriation_steps}, {total_npt_equilibriation_steps}")
     logging.info(f"total_n_equilibriation_steps (NVT+NPT) = {total_n_equilibriation_steps}")
 
-    logging.info(f"Using {forcefield_opt=} and water = {forcefield_opt}/water")
 
-    ##############
-    # specify forcefield
-    ##############
-    forcefield = ForceField(f"{forcefield_opt}.xml", f"{forcefield_opt}/water.xml")
-
-    ##############
-    # build modeller object
-    # delete crystallized water and add hydrogens, may not be needed
-    ##############
-    modeller = Modeller(pdb.topology, pdb.positions)
-    modeller.deleteWater()
-    # if not default_protonation:
-    #     _target_residue_chain = ""
-    #     _target_residue_id    = ""
-    #     _target_residue_1char = ""
-    #     _variants = change_protonation_batch(
-    #         modeller.topology, 
-    #         _target_residue_chain, 
-    #         _target_residue_id, 
-    #         _target_residue_1char
-    #     )
-    #     logging.info(
-    #         f"Changing protonation of chain, resID, resName: {_target_residue_chain}, {_target_residue_id}, {_target_residue_1char}"
-    #     )
-    #     logging.info("Assuming we want the lower pH protonation.")
-    #     residues = modeller.addHydrogens(forcefield, variants=_variants)
-    # else:
-    #     residues = modeller.addHydrogens(forcefield)
-
-    ##############
-    # add solvent (neutralizes the system)
-    ##############
-    if add_solvent:
-        if isinstance(box_padding, Quantity):
-            _condn = box_padding.value_in_unit(nanometer)<0
-        else:
-            _condn = box_padding < 0
+    if simulation_obj is None:
+        logging.info(f"no simulation object provided, creating one from the PDBFile object")
+        logging.info(f"Using {forcefield_opt=} and water = {forcefield_opt}/water")
         
+        ##############
+        # specify forcefield
+        ##############
+        forcefield = ForceField(f"{forcefield_opt}.xml", f"{forcefield_opt}/water.xml")
+
+        ##############
+        # build modeller object
+        # delete crystallized water and add hydrogens, may not be needed
+        ##############
+        modeller = Modeller(pdb.topology, pdb.positions)
+        modeller.deleteWater()
+        # if not default_protonation:
+        #     _target_residue_chain = ""
+        #     _target_residue_id    = ""
+        #     _target_residue_1char = ""
+        #     _variants = change_protonation_batch(
+        #         modeller.topology, 
+        #         _target_residue_chain, 
+        #         _target_residue_id, 
+        #         _target_residue_1char
+        #     )
+        #     logging.info(
+        #         f"Changing protonation of chain, resID, resName: {_target_residue_chain}, {_target_residue_id}, {_target_residue_1char}"
+        #     )
+        #     logging.info("Assuming we want the lower pH protonation.")
+        #     residues = modeller.addHydrogens(forcefield, variants=_variants)
+        # else:
+        #     residues = modeller.addHydrogens(forcefield)
+
+        ##############
+        # add solvent (neutralizes the system)
+        ##############
+        if add_solvent:
+            if isinstance(box_padding, Quantity):
+                _condn = box_padding.value_in_unit(nanometer)<0
+            else:
+                _condn = box_padding < 0
+            
 
 
-        if _condn:
-            logging.info(f"Using the box dimensions found in the topology: {modeller.topology.getUnitCellDimensions()}")
-            modeller.addSolvent(
-                forcefield,
-                boxVectors=pdb.topology.getPeriodicBoxVectors(),
-                positiveIon=positive_ion,
-                negativeIon=negative_ion,
-                neutralize=True,
-                ionicStrength=salt_concentration*molar
+            if _condn:
+                logging.info(f"Using the box dimensions found in the topology: {modeller.topology.getUnitCellDimensions()}")
+                modeller.addSolvent(
+                    forcefield,
+                    boxVectors=pdb.topology.getPeriodicBoxVectors(),
+                    positiveIon=positive_ion,
+                    negativeIon=negative_ion,
+                    neutralize=True,
+                    ionicStrength=salt_concentration*molar
+                )
+            else:
+                modeller.addSolvent(
+                    forcefield, 
+                    padding=box_padding, 
+                    positiveIon=positive_ion,
+                    negativeIon=negative_ion,
+                    neutralize=True,
+                    ionicStrength=salt_concentration*molar
+                )
+
+            # calculate actual ionic strenght post neutralization
+            calculate_actual_ionic_strength(modeller)
+
+            solvated_system_fpath = os.path.join(
+                params["output_dir"], 
+                params["job_name"] + "solvated_system.pdb"
             )
-        else:
-            modeller.addSolvent(
-                forcefield, 
-                padding=box_padding, 
-                positiveIon=positive_ion,
-                negativeIon=negative_ion,
-                neutralize=True,
-                ionicStrength=salt_concentration*molar
+            logging.info(f"Saving initial, solvated system to: {solvated_system_fpath}")
+            PDBFile.writeFile(
+                modeller.topology, 
+                modeller.positions, 
+                open(solvated_system_fpath,"w"), 
+                keepIds=True
             )
+            fix_pdb_periodic_boundaries_and_save(solvated_system_fpath, protein_only=False)
 
-        # calculate actual ionic strenght post neutralization
-        calculate_actual_ionic_strength(modeller)
 
-        solvated_system_fpath = os.path.join(
-            params["output_dir"], 
-            params["job_name"] + "solvated_system.pdb"
+        ##############
+        # setup system and integrator
+        ##############
+        system = forcefield.createSystem(modeller.topology, 
+                                        nonbondedMethod=PME, 
+                                        nonbondedCutoff=nonbonded_cutoff*nanometer, 
+                                        constraints=HBonds
         )
-        logging.info(f"Saving initial, solvated system to: {solvated_system_fpath}")
-        PDBFile.writeFile(
-            modeller.topology, 
-            modeller.positions, 
-            open(solvated_system_fpath,"w"), 
-            keepIds=True
+        _system_output_fpath = os.path.join(params['output_dir'], params["job_name"]+"system.xml")
+        save_system_to_xml(system, _system_output_fpath)
+
+        integrator = LangevinMiddleIntegrator(temperature*kelvin,
+                                            1/picosecond, 
+                                            step_size*femtoseconds
         )
-        fix_pdb_periodic_boundaries_and_save(solvated_system_fpath, protein_only=False)
+        integrator.setRandomNumberSeed(params["random_seed"])
 
+        simulation = Simulation(modeller.topology, system, integrator, platform)
+        simulation.context.setPositions(modeller.positions)
+        _topology = simulation.topology
+        _positions= simulation.context.getState(getPositions=True).getPositions()
+    else:
+        logging.info("Using the provided simulation object")
+        simulation = simulation_obj
+        system = simulation.context.getSystem()
+        _topology = simulation.topology
+        _positions= simulation.context.getState(getPositions=True).getPositions()
 
-    ##############
-    # setup system and integrator
-    ##############
-    system = forcefield.createSystem(modeller.topology, 
-                                    nonbondedMethod=PME, 
-                                    nonbondedCutoff=nonbonded_cutoff*nanometer, 
-                                    constraints=HBonds
-    )
-    _system_output_fpath = os.path.join(params['output_dir'], params["job_name"]+"system.xml")
-    save_system_to_xml(system, _system_output_fpath)
-
-    integrator = LangevinMiddleIntegrator(temperature*kelvin,
-                                        1/picosecond, 
-                                        step_size*femtoseconds
-    )
-    integrator.setRandomNumberSeed(params["random_seed"])
-
-    simulation = Simulation(modeller.topology, system, integrator, platform)
 
     if checkpoint_fname:
         logging.info(f"Loading checkpoint: {checkpoint_fname}")
         simulation.loadCheckpoint( os.path.join(params[ "output_dir"], checkpoint_fname) )
     else:
-        simulation.context.setPositions(modeller.positions)
 
         ##############
         # local energy minimization
@@ -435,7 +465,7 @@ def run_equilibration(pdb, params=None):
     ##############
     # position reporter
     simulation.reporters.append(
-        DCDReporter( os.path.join(output_dir,dcd_traj_fname), report_every_X_steps)
+        DCDReporter( os.path.join(output_dir, dcd_traj_fname), report_every_X_steps)
     )
 
     # state reporter 
@@ -457,8 +487,12 @@ def run_equilibration(pdb, params=None):
         )
     )
 
-    logging.info(f"Setting velocities with {temperature}kelvin, and random seed = {params['random_seed']}")
-    simulation.context.setVelocitiesToTemperature(temperature*kelvin, params["random_seed"])
+    _T = temperature * kelvin
+    _rs = int(params["random_seed"])
+    logging.info("Setting velocities to temperature and random seed...")
+    logging.info(f"T   = {_T!r}   type={type(_T).__name__}  is_quantity={_T}")
+    logging.info(f"rs  = {_rs!r}  type={type(_rs).__name__}")
+    simulation.context.setVelocitiesToTemperature(_T, _rs)
 
     ##############
     # Restrain protein backbone
@@ -479,7 +513,7 @@ def run_equilibration(pdb, params=None):
     ##############
     logging.info(f"Running NPT equilibriation for {total_npt_equilibriation_steps} steps...")
     _barostat = MonteCarloBarostat(1*bar, temperature*kelvin)
-    _barostat.setRandomNumberSeed(params["random_seed"])
+    _barostat.setRandomNumberSeed(_rs)
     system.addForce(
             _barostat
         )
@@ -503,7 +537,7 @@ def run_equilibration(pdb, params=None):
     )
     logging.info(f"Writing final positions of atoms to {_dcd_fpath}")
     PDBFile.writeFile(
-        modeller.topology, 
+        _topology, 
         simulation.context.getState(getPositions=True).getPositions(), 
         open(_dcd_fpath,"w"), 
         keepIds=True
@@ -522,6 +556,7 @@ def run_equilibration(pdb, params=None):
     # logging.info(f"Saved binary checkpoint to '{_checkpoint_fpath}'")
 
     logging.info("Done NVT/NPT equilibration")
+    return simulation
 
 
 if __name__=="__main__":
