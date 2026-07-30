@@ -1,3 +1,4 @@
+import shutil
 import warnings
 import Bio.PDB
 import PeptideBuilder
@@ -7,6 +8,7 @@ import os
 import time
 import numpy as np
 from io import StringIO, BytesIO
+import subprocess
 
 from aggrepep.helpers import biopython_to_pdbfixer_stringio, pdbfixer_workflow, rotate_around_length_axis, align_pc1_to_x_backbone
 
@@ -22,6 +24,8 @@ import openmm as omm
 import openmm.app as app
 from openmm.app import PDBFile, Modeller
 from openmm.unit import *
+
+import parmed as pmd
 
 from aggrepep.helpers import check_for_overlap
 
@@ -220,18 +224,75 @@ def center_on_origin(topology, positions, tolerance=0.01):
 def openmm_to_mdtraj_topology(omm_top):
     return mdt.Topology.from_openmm(omm_top)
 
+def fix_psf(src, dst):
+    with open(src) as fh:
+        lines = fh.readlines()
+ 
+    # EXT format uses 10-wide integer columns, standard uses 8.
+    ext = any("EXT" in ln for ln in lines[:5] if "PSF" in ln)
+    width = 10 if ext else 8
+ 
+    out = []
+    i = 0
+    n_fixed = 0
+    while i < len(lines):
+        line = lines[i]
+        out.append(line)
+        i += 1
+ 
+        if "!NATOM" not in line:
+            continue
+ 
+        # The integer preceding the !NATOM tag is the atom count.
+        try:
+            natom = int(line.split()[0])
+        except (ValueError, IndexError):
+            raise SystemExit(f"could not parse atom count from: {line!r}")
+ 
+        seen = 0
+        while seen < natom and i < len(lines):
+            atom = lines[i].rstrip("\n").rstrip()
+            i += 1
+            if not atom:                       # skip stray blank lines
+                out.append("\n")
+                continue
+            nf = len(atom.split())
+            if nf == 8:                        # missing imove -> append it
+                atom = atom + ("%*d" % (width, 0))
+                n_fixed += 1
+            elif nf < 8:
+                raise SystemExit(
+                    f"atom line {seen+1} has only {nf} fields; not a format "
+                    f"this script understands:\n  {atom!r}")
+            # nf >= 9: already has imove, leave alone
+            out.append(atom + "\n")
+            seen += 1
+ 
+        if seen != natom:
+            raise SystemExit(f"expected {natom} atom lines, found {seen}")
+ 
+    with open(dst, "w") as fh:
+        fh.writelines(out)
+ 
+    print(f"{src} -> {dst}: {n_fixed} atom line(s) given an imove column"
+          f" ({'EXT' if ext else 'standard'} width {width})")
+    if n_fixed == 0:
+        print("  (nothing changed -- the atom lines already had 9+ fields, "
+              "so your psfgen error is something else)")
+
 def main(params):
 
     sequence    = params["sequence"]
     sequence_id = params["sequence_id"]
     arrangement = params["arrangement"]
     output_dir  = params["output_dir"]
+    CHANGE_TERMINI=params["neutralize_termini"]
 
     if arrangement == "parallel":
         _phi, _psi = -120, 115 # from wikipedia page: https://en.wikipedia.org/wiki/Beta_sheet#Geometry
         _phi, _psi = -119, 113 # from https://bio.libretexts.org/Bookshelves/Biochemistry/Fundamentals_of_Biochemistry_(Jakubowski_and_Flatt)/01%3A_Unit_I-_Structure_and_Catalysis/04%3A_The_Three-Dimensional_Structure_of_Proteins/4.02%3A_Secondary_Structure_and_Loops
     elif arrangement == "antiparallel":
-        _phi, _psi = -140, 135 # frmo wikipedia page: https://en.wikipedia.org/wiki/Beta_sheet#Geometry
+        _phi, _psi = -140, 135 # from wikipedia page: https://en.wikipedia.org/wiki/Beta_sheet#Geometry
         _phi, _psi = -139, 135 # from same bio.libretext
 
     phis = [_phi]*(len(sequence)-1)
@@ -258,6 +319,36 @@ def main(params):
     _, positions = setup_and_minimize(topology, positions)
 
     if params["build_stacked_sheets"]:
+        if CHANGE_TERMINI:
+            # use parameter to change N-/C- termini
+            
+            # make temp file holding the monomer chain with H atoms
+            _temp_fpath=os.path.join(
+                params["output_dir"],"temp_default_capping.pdb"
+            )
+            PDBFile.writeFile(
+                topology, 
+                positions, 
+                open(_temp_fpath, 'w'), 
+                keepIds=True
+            )
+
+            # run psfgen script
+            _psfgen_neutralize_termini_script = "bash_scripts/aa_neutralize_termini.sh"
+            _inPDB = _temp_fpath
+            _outPDB= os.path.join(params["output_dir"],"temp_neutral_termini.pdb")
+            print(f"Running {_psfgen_neutralize_termini_script} on {_inPDB} to produce {_outPDB}")
+            subprocess.run([
+                str(_psfgen_neutralize_termini_script),
+                "./"+str(_inPDB),
+                "./"+str(_outPDB).replace(".pdb",""), 
+            ], check=True)
+
+            # load the new structure with the neutralized termini
+            topology  = PDBFile(_outPDB).topology
+            positions = PDBFile(_outPDB).positions
+
+
         overlap_check_method = "vdwradii"
         positions = align_pc1_to_x_backbone(topology, positions)
 
@@ -458,6 +549,9 @@ def main(params):
         logging.info("\nBox dimensions:")
         logging.info(new_twist_top.getUnitCellDimensions(),"\n")
 
+        ######################################
+        # Save the final stacked sheet structure to a PDB file
+        ######################################
         twist_pos_lst = []
         for _vec in new_twist_pos:
             _vec = _vec.value_in_unit(angstrom)
@@ -472,6 +566,75 @@ def main(params):
             open( os.path.join(output_dir,output_fname), 'w'), 
             keepIds=True
         )
+
+        if CHANGE_TERMINI:
+            logging.info("Making PSF file for neutralized termini stacked sheet structure...")
+            ######################################
+            # Make and save a PSF file for it
+            ######################################
+            # load file that psfgen made (the assembly coordinates)
+            assembly_pdb = pmd.load_file( os.path.join(output_dir,output_fname) )
+
+            ############################
+            # now make assembly psf file
+            ############################
+
+            # load monomer topology and coordinates separately
+            monomer_pdb = pmd.load_file(_outPDB)
+            monomer_psf = pmd.load_file(_outPDB.replace(".pdb",".psf"))
+
+            monomer_psf.coordinates = monomer_pdb.coordinates
+            num_atoms_per_monomer = len(monomer_psf.atoms)
+
+            # Duplicate the monomer topology 20 times
+            assembly_psf = monomer_psf * 20
+
+            # Copy the assembly coordinates over to the combined structure
+            assembly_psf.coordinates = assembly_pdb.coordinates
+
+            # Take chain/segids directly from assembly.pdb
+            if len(assembly_pdb.atoms) == len(assembly_psf.atoms):
+                for i, res in enumerate(assembly_psf.residues):
+                    pdb_res = assembly_pdb.residues[i]
+                    res.chain = pdb_res.chain
+                    res.segid = pdb_res.segid if pdb_res.segid else pdb_res.chain
+            else:
+                raise ValueError("Incompatible number of atoms between assembly and monomer files")
+
+            # Save the generated PSF
+            assembly_psf.save(
+                os.path.join(output_dir,output_fname).replace(".pdb",".psf"), 
+                overwrite=True,
+                vmd=True
+            )
+            assembly_psf.save(
+                os.path.join(output_dir,output_fname),
+                overwrite=True,
+                charmm=True
+            )
+            ######################
+            # now solvate the structure with VMD
+            ######################
+            logging.info("Solvating the stacked sheet structure with VMD...")
+            _solvate_script = "bash_scripts/solvate_with_vmd.sh"
+            _inPDB = os.path.join(output_dir,output_fname)
+            _inPSF = os.path.join(output_dir,output_fname).replace(".pdb",".psf")
+            _out_name= os.path.join(output_dir,"assembly")
+
+            logging.info("Fixing the solvated PSF file to ensure proper formatting...")
+            shutil.copy(_inPSF, _inPSF + ".bak")
+            fix_psf(_inPSF + ".bak", _inPSF)
+            
+            print(f"Running {_solvate_script} on {_inPDB} to produce {_out_name}.pdb and {_out_name}.psf")
+            subprocess.run([
+                str(_solvate_script),
+                "./"+str(_inPSF),
+                "./"+str(_inPDB),
+                "./"+str(_out_name),
+                "15"
+            ], check=True)
+
+
         logging.info("done")
 
     else:
@@ -490,7 +653,8 @@ if __name__ == "__main__":
     parser.add_argument("--arrangement", type=str, choices=["parallel", "antiparallel"], default="parallel", help="Arrangement of beta strands")
     parser.add_argument("--output_dir", type=str, default="./outputs", help="Directory to save output PDB files")
     parser.add_argument("--build_stacked_sheets", action="store_true", help="Whether to build stacked sheets (not implemented yet)")
-    
+    parser.add_argument("--neutralize_termini", action="store_true",   help="Whether to neutralize the termini with NH2 and COOH")
+
     args = parser.parse_args()
     params = vars(args)
 
