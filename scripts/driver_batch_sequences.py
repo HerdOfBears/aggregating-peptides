@@ -556,6 +556,7 @@ if __name__ == "__main__":
     # build inputs = {pep_id: sequence} 
     df = pd.read_csv(params["input_file"])
     inputs = {pid: seq for seq, pid in zip(df["sequence"], df["pep-id"])}
+    logging.info(f"Input are {inputs}")
     ###############################################################
     #params["neutral_cterminus"]=True
     # I10 = "SNNFGAILSS"
