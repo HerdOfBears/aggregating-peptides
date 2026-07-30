@@ -67,6 +67,8 @@
     "energy_file": "aa_energy.out",
     "box_padding": -1.0,
     "platform": "OpenCL",
-    "random_seed":42
-  }
+    "random_seed":42,
+    "neutralize_termini":"y"
+  },
+  "USE_AA":"y"
 }
