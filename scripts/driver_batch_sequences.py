@@ -8,6 +8,7 @@ which run *concurrently* (sharing a single GPU when one is available).
 """
 
 import os
+import datetime
 import shutil
 import subprocess
 import sys
@@ -23,12 +24,10 @@ import pandas as pd
 import numpy as np
 import MDAnalysis as mda
 
+from openmm import unit as omm_unit
 from openmm.app import PDBFile
-from aggrepep.openmm_helpers import npt_production_run
-
-from aggrepep.bayesian_optimization import MultiFidelityBO_Wu2019KG
-from aggrepep.generative_model import GenerativeModelWrapper
-
+from aggrepep.equilibration import run_equilibration
+from aggrepep.openmm_helpers import npt_production_run, make_simulation_from_psf
 from aggrepep.coagulation_theory import analyze_aggregation_trajectory
 from aggrepep.analysis import (
     compute_beta_content_score, 
@@ -109,17 +108,30 @@ def all_atom_pathway(sequence, pep_id, out_dir, params, replica_id=1):
     ##################################################
     # Step 1: build structure from sequence using sequence_to_structure.py    
     # ##################################################
+    if params["neutralize_termini"]=="y":
+        _args = [
+            "--sequence", sequence,
+            "--sequence_id", pep_id,
+            "--arrangement", params["arrangement"],
+            "--output_dir", str(out_dir),
+            "--build_stacked_sheets",
+            "--neutralize_termini"    
+        ]
+    else:
+        _args = [
+            "--sequence", sequence,
+            "--sequence_id", pep_id,
+            "--arrangement", params["arrangement"],
+            "--output_dir", str(out_dir),
+            "--build_stacked_sheets",
+        ]
+
     _output_fmt = "pdb"
     sequence_to_conformation_script = Path("scripts/sequence_to_structure.py")
     subprocess.run([
         sys.executable,  # Use the current Python interpreter
-        str(sequence_to_conformation_script),
-        "--sequence", sequence,
-        "--sequence_id", pep_id,
-        "--arrangement", params["arrangement"],
-        "--output_dir", str(out_dir),
-        "--build_stacked_sheets"
-    ], check=True)
+        str(sequence_to_conformation_script)] + _args, 
+        check=True)
 
     ##########################################
     # Step 2: Run equilibation: energy min, nvt and npt equilibrations
@@ -130,24 +142,98 @@ def all_atom_pathway(sequence, pep_id, out_dir, params, replica_id=1):
     wDir=out_dir
     inputFile=f"{jobPrefix}.pdb"
 
-    script_equilibration = Path("scripts/run_equilibration.py")
-    subprocess.run([
-        sys.executable,  # Use the current Python interpreter
-        str(script_equilibration),
-        "--pdb_file", inputFile,
-        "--input_dir", wDir,
-        "--output_dir", wDir,
-        "--job_name", jobName,
-        "--platform_name", params["platform"],
-        "--params_file", "params.json",
-        "--random_seed", str(randomSeed)
-    ])
+    if params["neutralize_termini"]=="y":
+        _box_file = "./"+str(Path(wDir) / f"assembly.box")
+        with open(_box_file, "r") as fh:
+            lx, ly, lz = (float(v) for v in fh.read().split())
+        params["box_dimensions"] = (lx, ly, lz)
+        logging.info(f"Neutralized termini requested. Box dimensions read from assembly.box")
+
+        _psf_file_name = str(Path(wDir) / "assembly.psf")
+        _pdb_file_name = str(Path(wDir) / "assembly.pdb") # used to use jobName.pdb/.psf
+        simulation = make_simulation_from_psf(
+            psf_topfile=_psf_file_name,
+            pdb_crdfile=_pdb_file_name,
+            params=params
+        )
+        logging.info(f"Created OpenMM Simulation object for {jobName} with neutralized termini.")
+
+    new_stuff = True
+    if new_stuff:
+        logging.info("Using new path for equilibration")
+        params["pdb_file"] =  inputFile
+        params["input_dir"] =  wDir
+        params["output_dir"] =  wDir
+        params["job_name"] =  jobName
+        if not params['job_name'].endswith("_"):
+            params['job_name'] += "_"
+
+        params["platform_name"] =  params["platform"]
+        # params["params_file"] =  "params.json",
+        params["random_seed"] =  str(randomSeed)
+        params["nvt_equilibration_time"] = 50*omm_unit.picoseconds
+        params["npt_equilibration_time"] = 50*omm_unit.picoseconds
+        params["restraint_force_magnitude"] = 10.0
+        # with open(args.params_file) as fobj:
+        #     loaded_params_file = json.load(fobj)
+
+        # for k, v in loaded_params_file.items():
+        #     params[k] = v
+        # params["params_file"] = args.params_file
+
+        os.makedirs(params["output_dir"], exist_ok=True)
+
+        # pdb_file    = args.pdb_file
+        pdb_file = inputFile
+        prefix = ""
+        log_dir = os.path.join(params["output_dir"], "logs/")
+        os.makedirs(log_dir, exist_ok=True)
+
+        today = datetime.datetime.now()
+        logfilename = f"{pdb_file}-sim.log"
+        logging.basicConfig(
+            filename= os.path.join(log_dir,logfilename),
+            filemode='a',
+            format='%(asctime)s,%(msecs)d %(name)s %(levelname)s %(message)s',
+            datefmt="%Y-%m-%d,%H:%M:%S",
+            level=logging.INFO
+        )
+        logging.info(f"==================================== Job {pdb_file} ID  ====================================")
+        logging.info("Starting equilibration...")
+        
+        pdb = PDBFile(
+            os.path.join(params[ "input_dir"], pdb_file)
+        )
+        if params["neutralize_termini"]=="y":
+            simulation = run_equilibration(pdb, params=params, simulation_obj=simulation)
+        else:
+            simulation = run_equilibration(pdb, params=params)
+
+        # new_stuff done
+    else:
+        script_equilibration = Path("scripts/run_equilibration.py")
+        subprocess.run([
+            sys.executable,  # Use the current Python interpreter
+            str(script_equilibration),
+            "--pdb_file", inputFile,
+            "--input_dir", wDir,
+            "--output_dir", wDir,
+            "--job_name", jobName,
+            "--platform_name", params["platform"],
+            "--params_file", "params.json",
+            "--random_seed", str(randomSeed)
+        ])
 
     ##########################################
     # Step 3: Run production
     ##########################################
     jobName=f"{jobPrefix}_rs{randomSeed}_"
-    inputFile=f"{jobName}solvated_system._pbcFixed.pdb"
+
+    if params["neutralize_termini"]=="y":
+        inputFile="assembly.pdb"
+    else:
+        inputFile=f"{jobName}solvated_system._pbcFixed.pdb"
+
     checkpointFile=f"{jobName}nvt_npt_equilibrated_system.xml"
     paramsFile="params.json"
     params["job_name"] = f"{jobPrefix}_rs{randomSeed}_"
@@ -160,7 +246,7 @@ def all_atom_pathway(sequence, pep_id, out_dir, params, replica_id=1):
     equilibrated_system_pdb = PDBFile( os.path.join(params['input_dir'], inputFile) )
 
     logging.info(f"Starting npt production run...")
-    npt_production_run(equilibrated_system_pdb, params)
+    npt_production_run(equilibrated_system_pdb, params, simulation_obj=simulation)
     logging.info(f"finished npt production run.")
 
     ##########################################
