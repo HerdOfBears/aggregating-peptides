@@ -30,7 +30,7 @@
     "temperature": 310,
     "pressure": 1.0,
     "time_step": 20,
-    "total_npt_time": 200.0,
+    "total_npt_time": 500.0,
     "number_of_steps": 50000,
     "integration_method": "LangevinIntegrator",
     "cutoff": 1.1,
@@ -42,7 +42,9 @@
     "output_frequency": 5000,
     "trajectory_file": "prod.xtc",
     "state_file": "state.csv",
-    "platform":"OpenCL"
+    "platform":"OpenCL",
+    "nmol":64,
+    "box_L":13.3
   },
   "all_atom_simulation": {
     "arrangement":"parallel",
