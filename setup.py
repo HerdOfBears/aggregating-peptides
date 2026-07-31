@@ -2,11 +2,13 @@ from setuptools import setup, find_packages
 
 setup(
     name="aggrepep",
+    packages=find_packages(),
+    package_data={"aggrepep": ["data/**/*"]},
+    include_package_data=False,
     version="0.1.0",
     author="Jyler Menard",
     author_email="jyler.menard@mail.concordia.ca",
     description="A package for aggrepep. This package provides tools for setting up, simulating (aa and cg), and analyzing peptide aggregation simulations.",
-    packages=find_packages(),
     install_requires=[
         "openmm",
         "martini_openmm",
