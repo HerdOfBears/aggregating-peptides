@@ -1,6 +1,9 @@
 """
-A data-driven aggregation morphology characterization method, 
-as per Statt, Kleeblatt, and Reinhart Soft Matter, 2021, 17, 7697–7707 (DOI: 10.1039/d1sm01012c)
+Morphology characterization methods. Split into two sections:
+- Fractal geometry characterization methods,
+    as per Grassberger and Procaccia (1983)
+- A data-driven aggregation morphology characterization method, 
+    as per Statt, Kleeblatt, and Reinhart Soft Matter, 2021, 17, 7697–7707 (DOI: 10.1039/d1sm01012c)
 
 Some of the functions in this file are adapted from original code provided by the authors of the above paper.
 
@@ -25,7 +28,58 @@ import numpy as np
 import torch
 from torch import nn
 
+###############################
+###############################
+# Fractal geometry characterization
+###############################
+###############################
+def compute_correlation_dimension(xyz_com, box, r_min=0.1, r_max=10.0, n_bins=50):
+    """
+    Computes the correlation dimension of a set of points
+    using Grassberger and Procaccia's method (1983).
 
+    if peptide chains are used, xyz_com should be the center of mass of each chain.
+    Parameters:
+    -----------
+    xyz_com : np.ndarray, shape (n_points, 3)
+        Coordinates of the points in 3D space.
+    box : np.ndarray, shape (6,)
+        Simulation box dimensions [lx, ly, lz, alpha, beta, gamma].
+    r_min : float
+        Minimum distance for correlation sum calculation.
+    r_max : float
+        Maximum distance for correlation sum calculation.
+    n_bins : int
+        Number of bins for the correlation sum calculation.
+        (i.e. number of r-values to compute C(r) for)
+        
+    Returns:
+    --------
+    r_values : np.ndarray
+        Array of distance values used for correlation sum calculation.
+    C_r : np.ndarray
+        Correlation sum values corresponding to r_values.
+    """
+
+    N = len(xyz_com)
+    _denom = N * (N - 1)/2
+
+    # compute pair distance array using minimum image convention
+    dists = distances.self_distance_array(xyz_com, box=box)
+
+    # compute correlation sum for a range of r values
+    r_values = np.logspace(np.log10(r_min), np.log10(r_max), num=n_bins)
+    C_r = np.zeros_like(r_values)
+    for i, r in enumerate(r_values):
+        C_r[i] = np.sum(dists < r) / _denom
+
+    return r_values, C_r
+
+###############################
+###############################
+# Reinhart's data-driven morphology characterization method
+###############################
+###############################
 def read_cg(top_filename, traj_filename, n_chains, frame=-1):
     """
     Assumes martini2 coarse-grained beads.
