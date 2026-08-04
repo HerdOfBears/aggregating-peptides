@@ -58,6 +58,7 @@ if __name__=="__main__":
     sigma = np.array([ranges[0, 1]/res[0], ranges[1, 1]/res[1], ranges[2, 1]/res[2]])
 
     gsd_files = []
+    expt_ids = []
     for experiment_dir in experiment_dirs:
         for _dir in os.listdir(experiment_dir):
             if "ipynb" in _dir: 
@@ -75,7 +76,7 @@ if __name__=="__main__":
                 if not os.path.isfile(_top_file) or not os.path.isfile(_traj_file):
                     continue
                 gsd_files.append((_top_file, _traj_file))
-        
+                expt_ids.append(_dir)
     print(f"found {len(gsd_files)} gsd files in {experiment_dirs}")
 
     traj = mda.Universe(gsd_files[0][0], gsd_files[0][1])
@@ -175,11 +176,20 @@ if __name__=="__main__":
 
     if only_last_frame:
         print(f"writing {os.path.join(args.out_dir, args.out_name)}")
+        results = {
+            "frame_embedding": frame_embedding,
+            "expt_ids": expt_ids
+        }
         with open(os.path.join(args.out_dir, args.out_name), 'wb') as fid:
-            pkl.dump(frame_embedding, fid)
+            pkl.dump(results, fid)
     else:
+        results = {
+            "frame_embedding": frame_embedding,
+            "expt_ids": expt_ids,
+            "timesteps": timesteps
+        }
         with open(os.path.join(args.out_dir, args.out_name), 'wb') as fid:
-            pkl.dump(frame_embedding, fid)
+            pkl.dump(results, fid)
 
     tf = time.time()
     print(f"total time taken: {tf-t0:.2f} seconds")
