@@ -21,6 +21,8 @@ from aggrepep.bayesian_optimization import MultiFidelityBO_Wu2019KG
 from aggrepep.generative_model import GenerativeModelWrapper
 
 from aggrepep.coagulation_theory import analyze_aggregation_trajectory
+from aggrepep.morphology import analyze_aggregate_shapes
+
 from aggrepep.analysis import (
     compute_beta_content_score, 
     compute_aggregation_propensity_contact, 
@@ -86,11 +88,16 @@ def coarse_grained_pw_pathway(sequence, pep_id, out_dir, params, replica_id=1):
     _universe = mda.Universe(str(Path(out_dir) / "solvated.gro"), str(Path(out_dir) / "prod.xtc"))
     
     aggregation_results = analyze_aggregation_trajectory(_universe, sequence, params=params)
+    shape_descriptors   = analyze_aggregate_shapes(      _universe, sequence, params=params)
+
+    results = {"shape_descriptors":shape_descriptors}
+    for k, v in aggregation_results.items():
+        results[k] = v
 
     # with open(Path(out_dir) / "analysis_results.json", "w") as f:
     #     json.dump(aggregation_results, f, indent=4)
 
-    return aggregation_results
+    return results
 
 def all_atom_pathway(sequence, pep_id, out_dir, params, replica_id=1):
     
@@ -341,6 +348,8 @@ def main(params):
         ################################################
         # run either the CG PW pathway or the all-atom pathway
         ################################################
+        _apsasa, _apcontact = None, None
+        _fibrallity_sigmoided, _kf_sigmoided = None, None
         if USE_AA:
             logging.info(f"Running all-atom pathway for peptide {pep_id}")
             _params = params["all_atom_simulation"]
@@ -350,8 +359,9 @@ def main(params):
             os.makedirs(_odir, exist_ok=True)
 
             all_atom_results = all_atom_pathway(   seq, pep_id, _odir, _params, replica_id=_replica_id)
-
-            new_scores = torch.tensor([[all_atom_results["agg_prop_score"][0] + all_atom_results["agg_prop_contact"]]], dtype=torch.double)
+            _apsasa = all_atom_results["agg_prop_score"][0]
+            _apcontact = all_atom_results["agg_prop_contact"][0]
+            new_scores = torch.tensor([[_apsasa + _apcontact]], dtype=torch.double)
 
             with open(_odir / "aa_analysis_results.pkl", "wb") as f:
                 pkl.dump(all_atom_results, f)
@@ -365,7 +375,28 @@ def main(params):
 
             cg_results = coarse_grained_pw_pathway(seq, pep_id, _odir, _params, replica_id=_replica_id)
 
-            new_scores = torch.tensor([[cg_results["SzalaMendyk2023"]["kf"]]], dtype=torch.double)
+            ###
+            # normalize scores so all scores are on the same scale (0-1ish)
+            _kf = torch.tensor([[cg_results["SzalaMendyk2023"]["kf"]]], dtype=torch.double)
+
+            _shape_descriptors = cg_results["shape_descriptors"]["ffi"]
+            _fibrallity = torch.tensor(
+                _shape_descriptors["l1_div_l2"]*_shape_descriptors["fiber_count"], 
+                dtype=torch.double
+            )
+
+            ##
+            # Kinetics factor
+            # sigmoid to map to (0,1) range. 
+            # Chosen Paremeters map kf=10 to 0.17, kf=30 to 0.5, kf=100 to 0.99. 
+            # Anything above 60 begins to have diminishing returns
+            _kf_sigmoided = 1.0 / (1.0 + torch.exp( -8.0*((_kf/100.0) - 0.3 ) )) 
+
+            # Fibrality factor
+            # Chosen parameters map 0 to 0.029, 9 to 0.52, 25 to 0.99, 
+            _fibrality_sigmoided = 1.0 / (1.0 + torch.exp( -10.0*((_fibrallity/25.0) - 0.35 ) )) 
+
+            new_scores = _kf_sigmoided + _fibrality_sigmoided
 
             with open(_odir / "cg_analysis_results.pkl", "wb") as f:
                 pkl.dump(cg_results, f)
@@ -383,7 +414,7 @@ def main(params):
             bayesopt_results["score"    ].append( new_scores.item() )
             bayesopt_results["cumulative_cost"].append( cumulative_cost )
             logging.info(f"BO iteration {i+1}/{N_ITERATIONS} | {seq=}, {_fidelity=},score={ new_scores.item() }, {cumulative_cost=}")
-    
+            logging.info(f"BO iteration {i+1}/{N_ITERATIONS} | scores: {_kf_sigmoided=}, {_fibrality_sigmoided=}, {_apsasa=}, {_apcontact=}")
     if USE_BAYES_OPTIMIZATION:
         bo_jobname = params["bayesian_optimization"]["jobname"]
         output_fpath = f"{params['wdir']}/{bo_jobname}_bo_results.pkl"
