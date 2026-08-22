@@ -28,6 +28,31 @@ import numpy as np
 import torch
 from torch import nn
 
+from aggrepep.shape_descriptors import calculate_ffi
+
+###############################
+###############################
+# Measure fibreness of biggest aggregate in a trajectory
+###############################
+###############################
+
+def analyze_aggregate_shapes(universe, sequence, params):
+    """
+    Analyze the shapes of aggregates in a trajectory using the FFI method.
+    """
+    results = {}
+
+    _ffi_data = calculate_ffi(
+        universe, 
+        sequence, 
+        min_fiber_size=params.get('min_fiber_size', 1000)
+    )
+
+    
+    results["ffi"] = _ffi_data
+
+    return results
+
 ###############################
 ###############################
 # Fractal geometry characterization
@@ -141,7 +166,7 @@ def read_cg(top_filename, traj_filename, n_chains, frame=-1):
     disp = f - ref[group_id]
     disp -= np.round(disp)
 
-    # sum displacements per group (no 1/N averaging, matching your original)
+    # sum displacements per group
     f_cg = ref.copy()
     np.add.at(f_cg, group_id, disp)
     f_cg -= np.round(f_cg)
