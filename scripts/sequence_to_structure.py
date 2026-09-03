@@ -340,8 +340,8 @@ def main(params):
             print(f"Running {_psfgen_neutralize_termini_script} on {_inPDB} to produce {_outPDB}")
             subprocess.run([
                 str(_psfgen_neutralize_termini_script),
-                "./"+str(_inPDB),
-                "./"+str(_outPDB).replace(".pdb",""), 
+                str(_inPDB),
+                str(_outPDB).replace(".pdb",""), 
             ], check=True)
 
             # load the new structure with the neutralized termini
@@ -628,9 +628,9 @@ def main(params):
             print(f"Running {_solvate_script} on {_inPDB} to produce {_out_name}.pdb and {_out_name}.psf")
             subprocess.run([
                 str(_solvate_script),
-                "./"+str(_inPSF),
-                "./"+str(_inPDB),
-                "./"+str(_out_name),
+                str(_inPSF),
+                str(_inPDB),
+                str(_out_name),
                 "15"
             ], check=True)
 
