@@ -14,17 +14,9 @@ We also select only the martini beads (BB, SC1, SC2, SC3) for the FFI calculatio
 
 import numpy as np
 import MDAnalysis as mda
-import matplotlib
-matplotlib.use('Agg')
-import matplotlib.pyplot as plt
 import pandas as pd
 
-from descriptors.utils import suppress_warnings, ensure_output_directory, setup_logger
-
-from aggrepep.martini_sasa import get_martini_vdw_radii
-from itertools import combinations
 from scipy.cluster.hierarchy import fcluster, linkage
-from scipy.stats import mode as stmode
 from MDAnalysis.lib.distances import distance_array
 
 
@@ -79,7 +71,7 @@ def calculate_ffi(universe, seq, min_fiber_size=DEFAULT_MIN_FIBER_SIZE,
     """Programmatic API for FFI analysis."""
 
     #peptides = u.select_atoms('all')
-    peptides = u.select_atoms('name BB SC1 SC2 SC3')
+    peptides = universe.select_atoms('name BB SC1 SC2 SC3')
 
     n_chains = len(peptides.residues) // len(seq)
     chain_groups = [
@@ -88,16 +80,16 @@ def calculate_ffi(universe, seq, min_fiber_size=DEFAULT_MIN_FIBER_SIZE,
     ]
     
     frame_data = []
-    frames = range(first, last or len(u.trajectory), skip)
+    frames = range(first, last or len(universe.trajectory), skip)
 
     for frame_number in frames:
-        u.trajectory[frame_number]
+        universe.trajectory[frame_number]
         chain_groups = [
             peptides.residues[len(seq)*i:len(seq)*(i+1)]
             for i in range(n_chains)
         ]
 
-        _member_atoms, _member_chain_indices = get_largest_cluster_beads(u, chain_groups, frame_number)
+        _member_atoms, _member_chain_indices = get_largest_cluster_beads(universe, chain_groups, frame_number)
 
         ####
         ## SWAPPED peptides FOR _member_atoms
