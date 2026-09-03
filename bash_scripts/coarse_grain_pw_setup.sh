@@ -58,13 +58,21 @@ SYSTEM_TOP="system.top"
 # start virtual environment
 source $VENV_DIR/venv-cg/bin/activate
 
+echo "if there is/are histidines in the peptide, we rename from HIS to HSD (neutral form)"
+# rename only the residue-name column (cols 18-20), any chain:
+awk '{ if (substr($0,1,6) ~ /ATOM|HETATM/ && substr($0,18,3)=="HIS") print substr($0,1,17) "HSD" substr($0,21); else print }' \
+    "$PROTEIN_PDB" > "$PROTEIN_NAME"_fixed.pdb
+rm $PROTEIN_PDB
+mv "$PROTEIN_NAME"_fixed.pdb $PROTEIN_PDB
+
 echo "ignoring hydrogens in inputted structure (martinize2 -ignh ...)"
 #############################################
 # martinize with Elastic Network model
 # CHANGED: -ff martini22 (Martini 2.2 protein params, compatible with 2.3P polarizable water)
 common_args=(-f "$PROTEIN_PDB" -x "$PROTEIN_CG_PDB" -o "$PROTEIN_ONLY_TOP"
              -ff martini22 -p backbone -ss "$SECONDARY_STRUCTURE"
-             -elastic -el $EN_lower -eu $EN_upper -noscfix -ignh)
+             -elastic -el $EN_lower -eu $EN_upper -noscfix -ignh
+	     -maxwarn unmapped-atom 1)
 
 if [[ "$AcNtermini" == "y" && "$amidateCtermini" == "y" ]]; then
     martinize2 "${common_args[@]}" -nt          # neutral termini at both ends
