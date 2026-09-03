@@ -335,6 +335,22 @@ def analyze_aggregation_trajectory(universe, sequence, frames_per_ns=10, params=
             "SzalaMendyk2023": {
                 "kf": fitted aggregation rate constant,
                 "r_squared": R^2 value for the fit
+            },
+            "int_add":{
+                'kf'
+                'chi2'
+                'reduced_chi2'
+                'success'
+                'fitted_curve'
+                'f'
+            },
+            "int_const":{
+                'kf'
+                'chi2'
+                'reduced_chi2'
+                'success'
+                'fitted_curve'
+                'f'
             }
         }
     """
@@ -347,6 +363,8 @@ def analyze_aggregation_trajectory(universe, sequence, frames_per_ns=10, params=
         "n_avg_cluster_size": None,
         "Treat1990": None,
         "SzalaMendyk2023": None,
+        "int_add":None,
+        "int_const":None,
         "notes":"Concentration in chains/nm^3, "
     }
     coagulation_results = {}
@@ -399,6 +417,26 @@ def analyze_aggregation_trajectory(universe, sequence, frames_per_ns=10, params=
     )
     kSM_results = (k_SM, r2_SM)
 
+    ### use umerical integration
+    # fit using additive kernel K_ij = kf*(i+j)
+    out_add = fit_kf_fast(
+        tvals, 
+        yvals, 
+        kind="additive", 
+        N=n_chains, 
+        V=volume_nm3,
+        kf_bounds=(1e-2, 500)
+    )
+    # fit using constant kernel
+    out_const = fit_kf_fast(
+        tvals, 
+        yvals, 
+        kind="constant", 
+        N=n_chains, 
+        V=volume_nm3,
+        kf_bounds=(1e-2, 500)
+    )
+
     # fill in results dictionary
     results["tvals"] = tvals
     results["initial_concentration"] = initial_concentration
@@ -412,6 +450,8 @@ def analyze_aggregation_trajectory(universe, sequence, frames_per_ns=10, params=
         "kf": k_SM,
         "r_squared": r2_SM
     }
+    results["int_add"]  =out_add
+    results["int_const"]=out_const
 
     return results
 
