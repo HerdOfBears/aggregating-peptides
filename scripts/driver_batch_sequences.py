@@ -35,6 +35,7 @@ from aggrepep.analysis import (
     compute_aggregation_propensity_sasa,
     compute_aggregation_propensity_sasa_mdt
 )
+from aggrepep.morphology import analyze_aggregate_shapes
 
 def args_parser():
     pass
@@ -99,8 +100,20 @@ def coarse_grained_pw_pathway(sequence, pep_id, out_dir, params, replica_id=1):
     _universe = mda.Universe(str(Path(out_dir) / "solvated.gro"), str(Path(out_dir) / "prod.xtc"))
     
     aggregation_results = analyze_aggregation_trajectory(_universe, sequence, params=params)
+    shape_descriptors   = analyze_aggregate_shapes(      _universe, sequence, params=params)
 
-    return aggregation_results
+    _top_fpath, _traj_fpath = str(Path(out_dir) / "solvated.gro"), str(Path(out_dir) / "prod.xtc")
+    _ap_sasa = compute_aggregation_propensity_sasa(_top_fpath, _traj_fpath, frames_per_ns=10)
+
+    results = {"shape_descriptors":shape_descriptors, "APsasa":_ap_sasa[0], "SASA_init":_ap_sasa[1], "SASA_avgLast10ns":_ap_sasa[2]}
+    for k, v in aggregation_results.items():
+        results[k] = v
+
+    # with open(Path(out_dir) / "analysis_results.json", "w") as f:
+    #     json.dump(aggregation_results, f, indent=4)
+
+    return results
+
 
 def all_atom_pathway(sequence, pep_id, out_dir, params, replica_id=1):
     
@@ -143,7 +156,7 @@ def all_atom_pathway(sequence, pep_id, out_dir, params, replica_id=1):
     inputFile=f"{jobPrefix}.pdb"
 
     if params["neutralize_termini"]=="y":
-        _box_file = "./"+str(Path(wDir) / f"assembly.box")
+        _box_file = str(Path(wDir) / f"assembly.box")
         with open(_box_file, "r") as fh:
             lx, ly, lz = (float(v) for v in fh.read().split())
         params["box_dimensions"] = (lx, ly, lz)
