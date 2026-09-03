@@ -33,9 +33,22 @@ from aggrepep.analysis import (
 def args_parser():
     pass
 
+def strip_terminal_oxt(in_pdb, out_pdb):
+    """Remove C-terminal carboxylate oxygens so martinize2 rebuilds the
+    terminus from its own modification. Safe to call in place (in==out)."""
+    drop = {"OXT", "OT1", "OT2"}
+    with open(in_pdb) as fh:
+        lines = fh.readlines()          # fully read first
+    with open(out_pdb, "w") as out:     # now safe to truncate
+        for L in lines:
+            if L.startswith(("ATOM", "HETATM")) and L[12:16].strip() in drop:
+                continue
+            out.write(L)
+    return out_pdb
+
 def coarse_grained_pw_pathway(sequence, pep_id, out_dir, params, replica_id=1):
 
-    shutil.copytree(params["force_field_path"], out_dir / "martini")
+    shutil.copytree(params["force_field_path"], out_dir / "martini", dirs_exist_ok=True)
     params["replica_id"] = replica_id
     ##################################################
     # Step 1: build structure from sequence using sequence_to_structure.py    
@@ -51,20 +64,28 @@ def coarse_grained_pw_pathway(sequence, pep_id, out_dir, params, replica_id=1):
         "--output_dir", str(out_dir),
     ], check=True)
 
+    strip_terminal_oxt(
+        os.path.join(str(out_dir),f"{pep_id}.pdb"), 
+        os.path.join(str(out_dir),f"{pep_id}.pdb")
+    )
     ###################################################
     # Step 2: set up the CG PW simulation
-    ###################################################
+    ################################################### 
     logging.info(f"Setting up CG PW simulation for peptide {pep_id} in {out_dir}")
     cg_pw_setup_script = Path("bash_scripts/coarse_grain_pw_setup.sh")
     _monomer_pdb = f"{pep_id}.pdb"
     _seq_length = len(sequence)
+    _nmol=params.get("nmol", 64)
+    _boxL=params.get("box_L",13.3)
     subprocess.run([
         str(cg_pw_setup_script),
         _monomer_pdb,
         str(_seq_length),
         str(out_dir),
         "y" if params["neutral_nterminus"] else "n",
-        "y" if params["neutral_cterminus"] else "n"
+        "y" if params["neutral_cterminus"] else "n",
+        str(_nmol),
+        str(_boxL)
     ], check=True)
 
     ###################################################
@@ -78,10 +99,10 @@ def coarse_grained_pw_pathway(sequence, pep_id, out_dir, params, replica_id=1):
         "--gro", str(Path(out_dir) / "solvated.gro"),
         "--top", str(Path(out_dir) / "system.top"),
         "--wdir", str(out_dir),
-        "--pw",
-        "--params_file", str(Path("params.json"))
+        "--params_file", str(Path(params["params_file"])),
+        "--pw"
     ], check=True)
-
+    
     ###################################################
     # step 4: run analysis 
     ###################################################
@@ -228,7 +249,8 @@ def encode_initial_data(df, model):
     _fidelities= df.fidelity.to_numpy().reshape(-1,1)
     _scores    = df.score.to_numpy().reshape(-1,1)
 
-    _initial_train_set = model.encode_sequences_to_latent(_sequences)      # (n_sequences, n_reduced_dim)
+    _initial_train_set, _mu = model.encode_sequences_to_latent(_sequences, return_latent_points=True)      # (n_sequences, n_reduced_dim)
+    logging.info(f"{_fidelities.shape=}, {_initial_train_set.shape=}, {len(_sequences)=}, {_mu.shape=}")
     train_x =  np.concatenate([_initial_train_set, _fidelities], axis=1)   # (n_sequences, n_reduced_dim+1)
     train_y = _scores
 
@@ -331,7 +353,7 @@ def main(params):
                 seq = seq[0]
             
             if SMOKE_TEST:
-                USE_AA=True
+                USE_AA=False
                 seq = "KGNITINITI"
                 print("forcing high-fidelity")
                 logging.info("hardcoded forcing of high-fidelity")
@@ -368,6 +390,10 @@ def main(params):
         else:
             logging.info(f"Running coarse-grained pathway for peptide {pep_id}")
             _params = params["coarse_grained_martini"]
+            
+            _params["params_file"] = params["params_file"]
+            _params["neutral_nterminus"] = params["neutral_nterminus"]
+            _params["neutral_cterminus"] = params["neutral_cterminus"]
 
             _replica_id = 1
             _odir = _odir / "cg" / f"replica-{_replica_id}"
@@ -384,6 +410,7 @@ def main(params):
                 _shape_descriptors["l1_div_l2"]*_shape_descriptors["fiber_count"], 
                 dtype=torch.double
             )
+            _fibrallity = _fibrallity[-100:].mean()  # average over the last 100 frames
 
             ##
             # Kinetics factor
@@ -441,6 +468,9 @@ if __name__=="__main__":
 
             for k, v in file_params.items():
                 params[k] = v
+
+            params['neutral_nterminus']=params['coarse_grained_martini']['neutral_nterminus']
+            params['neutral_cterminus']=params['coarse_grained_martini']['neutral_cterminus']
 
     params["SMOKE_TEST"] = False
     if params["smoke_test"]:
