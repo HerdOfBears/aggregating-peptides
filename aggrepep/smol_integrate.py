@@ -348,7 +348,7 @@ def build_observable_of_scaledtime(kind, N, V=1.0,
     obs_fn = _OBSERVABLES[observable]
 
     def f(tau):
-        tau = np.clip(np.atleast_1d(np.asarray(tau, float)), 0.0, float(tmax_scaled))
+        tau = np.clip(np.asarray(tau, float).ravel(), 0.0, float(tmax_scaled))
         n = np.clip(sol.sol(tau), 0.0, None)
         return obs_fn(n)
     return f
