@@ -12,16 +12,6 @@ import numpy as np
 from scipy.integrate import solve_ivp
 from scipy.optimize import least_squares, minimize_scalar
 
-# used for fitting the model to data:
-# which observable each model curve returns, given the integrated n(t)
-_OBSERVABLES = {
-    "number_average_size": number_average_size,   # L(t) = M1/M0
-    "total_clusters":      total_clusters,         # n_cluster(t) = sum_i n_i
-    "monomers":            lambda n: n[0],
-    "dimers":              lambda n: n[1],
-    "trimers":             lambda n: n[2],
-}
-
 # ---------- kernels (kf factored out so it is easily fittable) ----------
 def kernel_matrix(kind, N, kf=1.0):
     """
@@ -190,7 +180,15 @@ def number_average_size(n):   # L(t) = M1/M0
     """
     return total_monomers(n) / total_clusters(n)
 
-
+# used for fitting the model to data:
+# which observable each model curve returns, given the integrated n(t)
+_OBSERVABLES = {
+    "number_average_size": number_average_size,   # L(t) = M1/M0
+    "total_clusters":      total_clusters,         # n_cluster(t) = sum_i n_i
+    "monomers":            lambda n: n[0],
+    "dimers":              lambda n: n[1],
+    "trimers":             lambda n: n[2],
+}
 # ---------- fitting ----------
 
 
