@@ -428,5 +428,5 @@ def fit_kf_fast(t_data, y_data, kind, N, V=1.0,
         "reduced_chi2": chi2 / dof,
         "success": bool(res.success),
         "fitted_curve": f(kf_hat * t_data),
-        "f": f,   # reuse for bootstrap / repeated fits without re-integrating
+        # "f": f,   # reuse for bootstrap / repeated fits without re-integrating
     }
