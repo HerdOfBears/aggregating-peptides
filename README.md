@@ -19,13 +19,43 @@ At the moment, there is no pypi method of installing this package. So you will h
 ### Dependencies
 This project has a number of dependencies, some of which are captured in the setup.py and requirements.txt. But a version of gromacs is required for gmx insert-molecules. In the future, this will hopefully be updated such that we no longer require gromacs. [vermouth](https://github.com/marrink-lab/vermouth-martinize) is used for martinize2. [insane](https://github.com/Tsjerk/Insane) is used for solvation. [openmm](https://github.com/openmm/openmm) and [martini_openmm](https://github.com/maccallumlab/martini_openmm) are used for simulating all-atom and coarse-grained systems, respectively.
 
-### installation
+### Virtual environment
+First make a virtual environment. I recommend using uv for that purpose. 
+```
+uv venv my-env-name
+```
+
+### Activate the environment
+Once the environment is created, you may have to activate it. There are two ways of doing so:
+```
+uv my-env-name
+```
+or 
+```
+source my-env-name/bin/activate
+```
+
+### Grab additional dependencies
+martini_openmm and PDBFixer are not available on pypi. One option is to make a directory called 'additional-repos', and git clone martini_openmm and PDBFixer into that directory. Then pip install them:
+```
+uv additional-repos/martini_openmm/
+uv additional-repos/PDBFixer/
+```
+
+### install the aggrepep package
 ```bash
 pip install -e .
 ```
 
+## Usage on Digital Alliance of Canada 
+A boiler-plate slurm submission script is included, named submit_batch_job-minimal.sh 
+
 ## Usage
 Some usage of this package is command-line specific, and some of it is python specific. 
+
+> [!NOTE]
+> In coarse_grained_pw_setup.sh you must edit VENV_DIR to point to your virtual environment. 
+
 
 ### Command-line usage
 To run the pipeline with a desired sequence (with an arbitrary ID):
