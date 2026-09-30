@@ -2,9 +2,22 @@
 # aggrepep
 
 ## Introduction
-This repo is a toolkit for designing and examining self-assembling peptides. The package provides scripts and methods for setting up coarse-grained martini 2.3 polarizable water peptide aggregation simulations, all-atom assembly 'destabilization' simulations, and the analysis of these simulations. Self-assembling peptides are those peptides which will aggregate into (usually) nanofibers, which can then be used in various biomaterial and therapeutic applications.
+Self-assembling peptides are those peptides which will aggregate into (usually) nanofibers, which can then be used in various biomaterial and therapeutic applications. 
 
-In this project's methodology, we examine whether a given peptide sequence is prone to self-assemble through simulations. We offer two modes: all-atom disassembly, and coarse-grained assembly, simulations. In the first, a stack of 20 peptide chains are set up into two stacked 10mer sheets that maximize hydrophobic residues pointing inwards, and amount of beta-strand content as measured using MDTraj's dssp. In the second, CG assembly mode, a martini2.3 polarizable water simulation is setup and run. After a simulation is completed, analysis metrics are computed. 
+This repo is a toolkit for designing and examining self-assembling peptides. The package provides scripts and methods for setting up coarse-grained martini 2.3 polarizable water peptide aggregation simulations, all-atom assembly 'destabilization' simulations, and the analysis of these simulations.
+
+For all-atom assembly 'destabilization simulations', a stack of 20 peptide chains are set up into two stacked 10mer sheets that maximize hydrophobic residues pointing inwards, and amount of beta-strand content as measured using MDTraj's dssp. In the second, aggregation simulations, a martini2.3 polarizable water simulation is setup and run. After a simulation is completed, analysis metrics are computed. 
+
+Automated analysis depends on the chosen pathway:
+- Coarse-grained
+    - Kinetics of aggregation, fitting modified, finite-number of particles, Smoluchowski equations to the aggregation behaviour. Also fitting solutions of unmodified, infinite number of particles Smoluchowski equation.
+    - Fractal geometry estimation via correlation dimension
+    - Simple shape descriptors
+    - SASA aggregation propensity score 
+- All-atom
+    - Beta-strand content
+    - SASA aggregation propensity score
+    - Contact-based aggregation propensity score 
 
 ## Project Structure
 
@@ -38,8 +51,8 @@ source my-env-name/bin/activate
 ### Grab additional dependencies
 martini_openmm and PDBFixer are not available on pypi. One option is to make a directory called 'additional-repos', and git clone martini_openmm and PDBFixer into that directory. Then pip install them:
 ```
-uv additional-repos/martini_openmm/
-uv additional-repos/PDBFixer/
+uv pip install additional-repos/martini_openmm/
+uv pip install additional-repos/PDBFixer/
 ```
 
 ### install the aggrepep package
@@ -80,14 +93,7 @@ import aggrepep
 # result = aggrepep.analyze(peptide_sequence)
 ``` -->
 
-## Development
-
-- Clone the repository
-- Create a virtual environment
-- Install dependencies
-- Run tests if available
-
 ## Contributing
 
-Contributions are welcome. Please open issues for improvements or suggestions.
+Contributions are welcome. Please open issues for improvements or suggestions. Alternatively, feel free to email or message me. 
 
