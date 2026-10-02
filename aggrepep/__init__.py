@@ -3,7 +3,7 @@ __author__ = "Your Name"
 __email__ = "your.email@example.com"
 __license__ = "MIT"
 
-# Import other modules in the package (replace with actual module names)
+# Import other modules in the package 
 from . import helpers
 from . import hydrophobicity
 from . import minimization
