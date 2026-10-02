@@ -385,7 +385,8 @@ def run_equilibration(pdb, params=None, simulation_obj=None):
                                             1/picosecond, 
                                             step_size*femtoseconds
         )
-        integrator.setRandomNumberSeed(params["random_seed"])
+        _rs = int( params.get("random_seed", 42) )
+        integrator.setRandomNumberSeed(_rs)
 
         simulation = Simulation(modeller.topology, system, integrator, platform)
         simulation.context.setPositions(modeller.positions)
