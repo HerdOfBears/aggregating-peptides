@@ -69,6 +69,22 @@ Some usage of this package is command-line specific, and some of it is python sp
 > [!NOTE]
 > In coarse_grained_pw_setup.sh you must edit VENV_DIR to point to your virtual environment. 
 
+### Pure python usage
+It is recommended to run the code using the python scripts in the `scripts` directory. To test
+the installation and environment, run `python scripts/driver_import_only.py`. All this does is import
+all packages needed for the simulation workflow. If it breaks, it should lead you to a
+missing dependency.
+
+For default usage and to test that the code can run basic simulations, 
+
+`python scripts/driver_batch_sequences.py --input_file data/input_files/simpleseq.csv --wdir data/outputs/simpleseq --smoke_test --n_jobs 1 --params_file params.json` 
+
+<!-- ```python
+import aggrepep
+
+# Example usage
+# result = aggrepep.analyze(peptide_sequence)
+``` -->
 
 ### Command-line usage
 To run the pipeline with a desired sequence (with an arbitrary ID):
@@ -83,15 +99,7 @@ bash bash_scripts/run_pipeline_batch.sh
 ```
 Inside of the file you must specify USE_AA and also the sequences you want to simulate. 
 
-### Pure python usage
-Some of the functions in the package can be imported from Python
 
-<!-- ```python
-import aggrepep
-
-# Example usage
-# result = aggrepep.analyze(peptide_sequence)
-``` -->
 
 ## Contributing
 
