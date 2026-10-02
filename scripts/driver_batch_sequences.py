@@ -155,6 +155,9 @@ def all_atom_pathway(sequence, pep_id, out_dir, params, replica_id=1):
     wDir=out_dir
     inputFile=f"{jobPrefix}.pdb"
 
+    # Termini neutralization requires different simulation building
+    # pathway because the termini aren't immediately part of 
+    # openmm forcefield objects
     if params["neutralize_termini"]=="y":
         _box_file = str(Path(wDir) / f"assembly.box")
         with open(_box_file, "r") as fh:
