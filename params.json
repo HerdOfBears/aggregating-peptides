@@ -70,7 +70,7 @@
     "box_padding": -1.0,
     "platform": "OpenCL",
     "random_seed":42,
-    "neutralize_termini":"y"
+    "neutralize_termini":"n"
   },
   "USE_AA":"y"
 }
