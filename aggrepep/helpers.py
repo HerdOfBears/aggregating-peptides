@@ -583,7 +583,7 @@ def rotate_around_length_axis(
 ):
     """Rotate all atoms around the peptide’s length axis by `angle`; return new positions (Quantity[list[Vec3]])."""
     theta = float(angle.value_in_unit(unit.radian)) if hasattr(angle, "unit") else float(angle)
-    print(f"{theta=}")
+    #print(f"{theta=}")
     pivot_nm, axis = find_length_axis(topology, positions, selection, method)
     k = _normalize(axis)
 
