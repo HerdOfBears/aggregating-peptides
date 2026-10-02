@@ -4,6 +4,7 @@
 from sklearn.linear_model import LinearRegression
 
 from aggrepep.clustering_analysis import compute_mu_i_t, compute_moment_i_of_cluster_size_distribution
+from aggrepep.smol_integrate import fit_kf_fast
 
 import numpy as np
 from pathlib import Path
